@@ -2,7 +2,7 @@
 
 A flight strategy explorer for the cost-conscious traveler. Interactive world map showing cheapest cached fares from any origin, with a recommendation engine that scores four booking strategies side by side: cash, airline miles, ShopBack cashback, and VPN-arbitraged currency.
 
-**Live demo:** `https://<username>.github.io/flightcompass/`
+**Live demo:** `https://<felixdlanger>.github.io/flightcompass/`
 
 ## What it does
 
