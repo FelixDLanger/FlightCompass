@@ -1,4 +1,4 @@
-name: Refresh flight data
+name: Refresh flight data manual
 
 # Runs weekly Tuesday 06:00 UTC (airlines typically push weekly fare sales Tuesday morning).
 # Also runnable manually from the Actions tab.
