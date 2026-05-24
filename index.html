@@ -1,0 +1,1719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FlightCompass &mdash; Flight Strategy Explorer</title>
+<meta name="description" content="Visual world map of cheapest cached flights with recommendation engine across cash, miles, ShopBack cashback, and Amex Platinum FHR. Strategy guidance, not booking tool.">
+<meta name="author" content="Felix Diego Langer">
+<meta name="keywords" content="flight strategy, cheapest flights, award charts, miles redemption, ShopBack cashback, Amex Platinum FHR, travel hacking">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#04080f">
+<meta property="og:title" content="FlightCompass &mdash; Flight Strategy Explorer">
+<meta property="og:description" content="Visual flight strategy map: cheapest fares, miles award charts, cashback platforms, and booking-channel guidance.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="FlightCompass">
+<meta name="twitter:description" content="Flight strategy explorer with multi-currency, miles, and cashback layers.">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2304080f'/%3E%3Ccircle cx='50' cy='50' r='28' fill='none' stroke='%2300d4ff' stroke-width='3'/%3E%3Cpath d='M50 22 L54 50 L78 54 L54 50 L50 78 L46 50 L22 46 L46 50 Z' fill='%2300e8a0'/%3E%3Ccircle cx='50' cy='50' r='3' fill='%23b57aff'/%3E%3C/svg%3E">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Cabinet+Grotesk:wght@400;700;800;900&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+:root{--bg:#04080f;--s1:#0a1220;--s2:#0f1a2e;--bd:#1c304d;--bd2:#243d5e;--cy:#00d4ff;--cy2:rgba(0,212,255,.12);--gn:#00e8a0;--gn2:rgba(0,232,160,.1);--vi:#b57aff;--vi2:rgba(181,122,255,.12);--or:#ff7c3a;--or2:rgba(255,124,58,.1);--gd:#ffc857;--gd2:rgba(255,200,87,.1);--tx:#d8e8f8;--mt:#4a6a8a;--mt2:#2a4a6a}
+body{font-family:'Cabinet Grotesk',sans-serif;background:var(--bg);color:var(--tx);display:flex;flex-direction:column}
+header{flex-shrink:0;display:flex;align-items:center;gap:12px;padding:0 20px;height:52px;border-bottom:1px solid var(--bd);background:rgba(4,8,15,.97);z-index:40}
+.logo{display:flex;align-items:center;gap:9px;font-size:16px;font-weight:900;letter-spacing:-.4px;color:var(--cy);flex-shrink:0}
+.logo-orb{width:22px;height:22px;border-radius:50%;background:conic-gradient(var(--cy) 0deg 120deg,var(--gn) 120deg 240deg,var(--vi) 240deg 360deg);animation:orb-spin 6s linear infinite;flex-shrink:0}
+@keyframes orb-spin{to{transform:rotate(360deg)}}
+.h-sep{width:1px;height:24px;background:var(--bd);flex-shrink:0}
+.h-field{background:var(--s2);border:1px solid var(--bd);color:var(--tx);padding:5px 10px;border-radius:5px;font-family:'DM Mono',monospace;font-size:11px;outline:none}
+.h-field:focus{border-color:var(--cy)}
+.h-field.origin{width:90px}
+.pill-row{display:flex;background:var(--s2);border:1px solid var(--bd);border-radius:6px;overflow:hidden}
+.pill{padding:5px 11px;font-family:'DM Mono',monospace;font-size:10px;cursor:pointer;background:none;border:none;color:var(--mt);transition:all .18s;letter-spacing:.4px}
+.pill.on-cash{background:var(--cy);color:var(--bg);font-weight:700}
+.pill.on-miles{background:var(--vi);color:#fff;font-weight:700}
+.pill.on-both{background:var(--gn);color:var(--bg);font-weight:700}
+.pill.on-cashback{background:var(--or);color:#fff;font-weight:700}
+.h-btn{padding:5px 14px;border-radius:5px;border:none;cursor:pointer;font-family:'Cabinet Grotesk',sans-serif;font-weight:700;font-size:12px;flex-shrink:0}
+.h-btn.primary{background:var(--cy);color:var(--bg)}
+.h-btn.primary:hover{filter:brightness(1.12)}
+.h-spacer{flex:1}
+.statusbar{flex-shrink:0;display:flex;align-items:center;gap:8px;padding:4px 20px;border-bottom:1px solid var(--bd);background:var(--s1);font-family:'DM Mono',monospace;font-size:10px}
+.sdot{width:6px;height:6px;border-radius:50%;flex-shrink:0;transition:background .3s}
+.sdot.snapshot{background:var(--gn);animation:blink 3s ease-in-out infinite}
+.sdot.demo{background:var(--or)}
+.sdot.busy{background:var(--cy);animation:blink .6s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+#sStatus{color:var(--mt)}
+#sSource{margin-left:auto;color:var(--mt2);padding-left:12px;border-left:1px solid var(--bd)}
+.bc{flex-shrink:0;display:flex;align-items:center;gap:5px;padding:5px 20px;border-bottom:1px solid var(--bd);font-family:'DM Mono',monospace;font-size:10px;color:var(--mt);background:rgba(10,18,32,.6)}
+.bc-link{color:var(--cy);cursor:pointer}
+.bc-link:hover{opacity:.6}
+.bc-sep{color:var(--bd2)}
+.bc-cur{color:var(--tx)}
+.main{display:flex;flex:1;min-height:0;overflow:hidden;margin-bottom:28px}
+.mapwrap{flex:1;position:relative;overflow:hidden;background:radial-gradient(ellipse at 48% 58%,#091728 0%,var(--bg) 100%)}
+#msvg{display:block;width:100%;height:100%}
+.cp{fill:#0b1c30;stroke:#112338;stroke-width:.45;cursor:pointer;transition:fill .22s}
+.cp:hover{fill:#162d48}
+.cp.hi{fill:#0d2540;stroke:#1e4060}
+.cp.sel{fill:#0a2e20;stroke:var(--gn);stroke-width:1.2}
+.arc{fill:none;stroke:var(--cy);stroke-width:1.6;stroke-dasharray:7 5;animation:arc-dash 2.6s linear infinite;opacity:.65}
+.arc.am{stroke:var(--vi)}
+.arc.ao{stroke:var(--or)}
+.arc.dim{opacity:.18;stroke-width:.9}
+@keyframes arc-dash{to{stroke-dashoffset:-48}}
+.pin{cursor:pointer}
+.pin rect{transition:filter .15s}
+.pin:hover rect{filter:brightness(1.35)}
+.plabel{font-family:'DM Mono',monospace;text-anchor:middle;dominant-baseline:middle;pointer-events:none}
+.ldover{position:absolute;inset:0;background:rgba(4,8,15,.84);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:20;opacity:0;pointer-events:none;transition:opacity .22s}
+.ldover.on{opacity:1;pointer-events:all}
+.ld-spin{width:34px;height:34px;border-radius:50%;border:2px solid var(--bd2);border-top-color:var(--cy);animation:ld-turn .65s linear infinite}
+@keyframes ld-turn{to{transform:rotate(360deg)}}
+.ldmsg{font-family:'DM Mono',monospace;font-size:10px;color:var(--mt);letter-spacing:.8px;text-align:center;max-width:280px;line-height:1.5}
+.tt{position:fixed;background:var(--s2);border:1px solid var(--bd);border-radius:6px;padding:8px 12px;pointer-events:none;opacity:0;transition:opacity .1s;z-index:100;min-width:130px}
+.tt.on{opacity:1}
+.ttn{font-weight:700;font-size:12px;margin-bottom:3px}
+.tts{font-family:'DM Mono',monospace;font-size:10px;color:var(--cy);margin-top:1px}
+.ttm{font-family:'DM Mono',monospace;font-size:10px;color:var(--vi);margin-top:1px}
+.ttc{font-family:'DM Mono',monospace;font-size:10px;color:var(--or);margin-top:1px}
+.sb{flex-shrink:0;width:340px;background:var(--s1);border-left:1px solid var(--bd);display:flex;flex-direction:column;overflow:hidden}
+.sbh{padding:15px 16px 11px;border-bottom:1px solid var(--bd);flex-shrink:0}
+.sbey{font-family:'DM Mono',monospace;font-size:8.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--mt);margin-bottom:3px}
+.sbt{font-size:16px;font-weight:900;line-height:1.2}
+.sbm{font-family:'DM Mono',monospace;font-size:9px;color:var(--mt);margin-top:3px}
+.sbl{flex:1 1 auto;overflow-y:auto;padding:9px;min-height:120px;-webkit-overflow-scrolling:touch}
+.sbl::-webkit-scrollbar{width:3px}
+.sbl::-webkit-scrollbar-thumb{background:var(--bd);border-radius:2px}
+.card{background:var(--s2);border:1px solid var(--bd);border-radius:7px;padding:11px 13px;margin-bottom:6px;cursor:pointer;transition:all .18s;position:relative;overflow:hidden}
+.card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:3px 0 0 3px}
+.card.cy::before{background:var(--cy)}
+.card.gn::before{background:var(--gn)}
+.card.vi::before{background:var(--vi)}
+.card.or::before{background:var(--or)}
+.card:hover{transform:translateX(3px)}
+.card.cy:hover{border-color:var(--cy)}
+.card.gn:hover{border-color:var(--gn)}
+.card.vi:hover{border-color:var(--vi)}
+.card.or:hover{border-color:var(--or)}
+.crow{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:7px}
+.cname{font-size:14.5px;font-weight:800;letter-spacing:-.2px;line-height:1.2}
+.csub{font-family:'DM Mono',monospace;font-size:9px;color:var(--mt);margin-top:1px}
+.cprice{font-family:'DM Mono',monospace;font-size:13px;font-weight:500;white-space:nowrap;text-align:right}
+.cprice.cy{color:var(--cy)}.cprice.gn{color:var(--gn)}.cprice.vi{color:var(--vi)}.cprice.or{color:var(--or)}
+.cprice small{font-size:9px;display:block;color:var(--mt);font-weight:400;margin-top:2px}
+.tags{display:flex;gap:4px;flex-wrap:wrap}
+.t{font-family:'DM Mono',monospace;font-size:8px;padding:2px 6px;border-radius:3px}
+.t.def{background:rgba(255,255,255,.04);color:var(--mt)}
+.t.cy{background:var(--cy2);color:var(--cy)}.t.gn{background:var(--gn2);color:var(--gn)}
+.t.vi{background:var(--vi2);color:var(--vi)}.t.or{background:var(--or2);color:var(--or)}
+.t.gd{background:var(--gd2);color:var(--gd)}
+.badge{position:absolute;top:-8px;left:11px;font-family:'DM Mono',monospace;font-size:8px;font-weight:700;padding:2px 7px;border-radius:3px;letter-spacing:.6px;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.badge.gn{background:var(--gn);color:var(--bg)}.badge.or{background:var(--or);color:#fff}.badge.vi{background:var(--vi);color:#fff}
+.dp{flex:1 1 auto;min-height:0;max-height:55vh;border-top:1px solid var(--bd);padding:13px 16px;background:rgba(0,212,255,.025);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.dp::-webkit-scrollbar{width:3px}
+.dp::-webkit-scrollbar-thumb{background:var(--bd);border-radius:2px}
+.dpt{font-family:'DM Mono',monospace;font-size:8.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--mt);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.dpt-icon{font-size:11px}
+.dr{display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:10.5px;margin-bottom:5px}
+.dl{color:var(--mt)}.dv{font-weight:500}
+.dv.cy{color:var(--cy)}.dv.gn{color:var(--gn)}.dv.vi{color:var(--vi)}.dv.or{color:var(--or)}.dv.gd{color:var(--gd)}
+.ddiv{border:none;border-top:1px solid var(--bd);margin:9px 0 8px}
+.ctable{width:100%;border-collapse:collapse;margin:5px 0;font-family:'DM Mono',monospace;font-size:9px}
+.ctable th{color:var(--mt);font-weight:400;text-align:left;padding:2px 4px;border-bottom:1px solid var(--bd)}
+.ctable td{padding:3px 4px}
+.ctable tr.best-cur td{color:var(--gn);font-weight:600}
+.ctable tr:not(.best-cur) td{color:var(--tx)}
+.rec-box{border-radius:7px;padding:11px 13px;margin-bottom:10px;border:1.5px solid}
+.rec-box.w-cash{border-color:var(--gn);background:linear-gradient(135deg,rgba(0,232,160,.07),rgba(0,232,160,.02))}
+.rec-box.w-miles{border-color:var(--vi);background:linear-gradient(135deg,rgba(181,122,255,.09),rgba(181,122,255,.02))}
+.rec-box.w-cashback{border-color:var(--or);background:linear-gradient(135deg,rgba(255,124,58,.09),rgba(255,124,58,.02))}
+.rec-box.w-vpn{border-color:var(--cy);background:linear-gradient(135deg,rgba(0,212,255,.07),rgba(0,212,255,.02))}
+.rec-box.w-amex{border-color:var(--gd);background:linear-gradient(135deg,rgba(255,200,87,.09),rgba(255,200,87,.02))}
+.rec-box.w-none{border-color:var(--bd);background:var(--s2)}
+.rec-eyebrow{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:1.5px;text-transform:uppercase;color:var(--mt);margin-bottom:5px;display:flex;align-items:center;gap:6px}
+.rec-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.rec-headline{font-size:13px;font-weight:900;line-height:1.35;margin-bottom:5px}
+.rec-headline .cy{color:var(--cy)}.rec-headline .gn{color:var(--gn)}.rec-headline .vi{color:var(--vi)}.rec-headline .or{color:var(--or)}.rec-headline .gd{color:var(--gd)}
+.rec-body{font-family:'DM Mono',monospace;font-size:9px;color:var(--mt);line-height:1.75}
+.rec-body strong{color:var(--tx)}
+.strategy-list{margin-top:10px;padding-top:10px;border-top:1px solid var(--bd)}
+.strat-item{font-family:'DM Mono',monospace;font-size:9px;color:var(--mt);line-height:1.7;margin-bottom:8px;padding-left:18px;position:relative}
+.strat-item::before{content:attr(data-icon);position:absolute;left:0;top:0;font-size:11px}
+.strat-item strong{color:var(--tx);display:block;margin-bottom:2px;font-family:'Cabinet Grotesk',sans-serif;font-size:10.5px;font-weight:700}
+.disclaim{font-family:'DM Mono',monospace;font-size:8px;color:var(--mt2);line-height:1.6;margin-top:8px;padding:6px 8px;background:rgba(255,200,87,.04);border:1px solid rgba(255,200,87,.12);border-radius:4px}
+.modal-bg{position:fixed;inset:0;background:rgba(4,8,15,.92);display:flex;align-items:center;justify-content:center;z-index:200}
+.modal-bg.off{display:none}
+.modal{background:var(--s1);border:1px solid var(--bd);border-radius:11px;padding:28px;width:520px;max-width:94vw}
+.modal h2{font-size:19px;font-weight:900;color:var(--cy);margin-bottom:6px}
+.modal-sub{font-family:'DM Mono',monospace;font-size:10px;color:var(--mt);line-height:1.7;margin-bottom:14px}
+.modal-sub strong{color:var(--gn)}
+.mactions{display:flex;gap:8px;margin-top:6px}
+.mbtn{flex:1;padding:11px;border-radius:5px;border:none;cursor:pointer;font-family:'Cabinet Grotesk',sans-serif;font-weight:800;font-size:13px}
+.mbtn.p{background:var(--cy);color:var(--bg)}
+.mbtn.s{background:var(--s2);color:var(--mt);border:1px solid var(--bd)}
+.mbtn:hover{opacity:.85}
+.mnote{font-family:'DM Mono',monospace;font-size:8.5px;color:var(--mt2);margin-top:13px;line-height:1.8;padding-top:10px;border-top:1px solid var(--bd)}
+.mnote code{background:var(--s2);padding:1px 4px;border-radius:2px;color:var(--cy)}
+
+
+.rec-scores{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:11px}
+.rs{padding:9px 4px 7px;border-radius:6px;text-align:center;font-family:'DM Mono',monospace;border:1px solid}
+.rs.active{opacity:1}
+.rs.dim{opacity:.32}
+.rs-val{font-size:15px;font-weight:800;display:block;margin-bottom:5px;line-height:1;letter-spacing:-.5px}
+.rs-lbl{color:var(--mt);font-size:8px;letter-spacing:.5px;display:block;line-height:1.4;text-transform:uppercase}
+.rs.s-cash{border-color:var(--gn);background:rgba(0,232,160,.06)}
+.rs.s-cash .rs-val{color:var(--gn)}
+.rs.s-miles{border-color:var(--vi);background:rgba(181,122,255,.07)}
+.rs.s-miles .rs-val{color:var(--vi)}
+.rs.s-cb{border-color:var(--or);background:rgba(255,124,58,.07)}
+.rs.s-cb .rs-val{color:var(--or)}
+.rs.s-vpn{border-color:var(--cy);background:rgba(0,212,255,.06)}
+.rs.s-vpn .rs-val{color:var(--cy)}
+
+/* === MOBILE === */
+@media (max-width: 768px){
+  /* Allow the whole page to scroll naturally on mobile */
+  html,body{overflow:auto;height:auto}
+  body{padding-bottom:40px}
+  body{display:block;min-height:100vh}
+
+  header{flex-wrap:wrap;height:auto;padding:6px 12px;gap:6px;position:sticky;top:0}
+  .logo{font-size:14px}
+  .h-sep{display:none}
+  .h-field.origin{width:70px;font-size:11px}
+  .h-btn{padding:5px 12px;font-size:12px}
+  .h-spacer{flex:0 0 100%;height:0}
+
+  .statusbar{position:sticky;top:48px;z-index:39}
+  .bc{position:sticky;top:73px;z-index:38}
+
+  /* Stack: map first (small), then sidebar (no constraint, page scrolls) */
+  .main{flex-direction:column;margin-bottom:0;min-height:auto;overflow:visible;display:block}
+  .mapwrap{display:block;width:100%;height:32vh;min-height:240px;flex:none}
+  #msvg{height:32vh;min-height:240px}
+
+  /* Sidebar becomes a normal block, not a flex column */
+  .sb{display:block;width:100%;flex:none;border-left:none;border-top:1px solid var(--bd);overflow:visible;max-height:none}
+  .sbh{padding:12px 14px 9px}
+  .sbl{flex:none;overflow:visible;padding:9px;max-height:none;min-height:0}
+  .dp{display:block;flex:none;max-height:none;overflow:visible;-webkit-overflow-scrolling:auto;padding-bottom:120px}
+
+  #footer{position:relative;font-size:8px;padding:6px 10px;gap:8px;flex-wrap:wrap;height:auto;min-height:24px}
+  #footer span:nth-child(4),#footer span:nth-child(5){display:none}
+
+  .modal{padding:18px;width:94vw}
+  .modal h2{font-size:16px}
+}
+@media (max-width: 480px){
+  header{padding:6px 8px;gap:5px}
+  .logo{flex:1;font-size:13px}
+  .h-field.origin{width:60px}
+  .h-btn{padding:5px 10px;font-size:11px}
+  .mapwrap{height:28vh;min-height:200px}
+  #msvg{height:28vh;min-height:200px}
+}
+</style>
+</head>
+<body>
+
+
+<div class="modal-bg off" id="aboutModal">
+  <div class="modal" style="width:480px">
+    <h2 style="font-size:17px">About FlightCompass</h2>
+    <div style="font-family:DM Mono,monospace;font-size:10.5px;color:var(--mt);line-height:1.75">
+      <p style="margin-bottom:10px"><strong style="color:var(--tx)">A research-oriented strategy explorer</strong>, not a booking platform. Built by Felix Diego Langer as part of doctoral research in business administration (DBA) at GlobalNxt University.</p>
+      <p style="margin-bottom:10px"><strong style="color:var(--tx)">Methodology:</strong> Flight prices are sourced from the Aviasales/Travelpayouts cache (refreshed weekly, up to 7 days stale). Award charts, cashback rates, and hotel benchmarks are hand-curated. The recommendation engine compares multiple booking strategies on a per-route basis using transparent scoring formulas.</p>
+      <p style="margin-bottom:10px"><strong style="color:var(--tx)">Editorial principle:</strong> honest analysis first, monetization-aware second. Affiliate links are shown only when the corresponding option is the engine\u2019s best recommendation for the route. Where other paths score higher \u2014 direct airline booking, miles redemption, or hotel partner perks \u2014 the analysis surfaces those instead, with no affiliate revenue earned.</p>
+      <p style="margin-bottom:10px"><strong style="color:var(--tx)">Contact:</strong> reach me on <a href="https://www.linkedin.com/in/felix-langer-2a8425168/" target="_blank" rel="noopener" style="color:var(--cy);text-decoration:none">LinkedIn</a> for questions, corrections, or research collaboration.</p>
+      <p style="margin-bottom:10px"><strong style="color:var(--tx)">Data &amp; privacy:</strong> no cookies, no tracking, no personal data collected by this page. Affiliate clicks redirect to external services with their own privacy policies.</p>
+      <p style="font-size:9px;opacity:.7">Not financial advice. Not a booking tool. Always verify prices, award availability, cashback rates, and FHR perks on the actual booking site before transacting. Currency conversion, taxes, and fees may vary by channel.</p>
+    </div>
+    <div class="mactions" style="margin-top:18px">
+      <button class="mbtn p" id="aboutClose">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg off" id="modal">
+  <div class="modal">
+    <h2>FlightCompass</h2>
+    <div class="modal-sub">Snapshot file not found. The app is running on curated demo data. If you have just deployed, run the GitHub Action manually once.</div>
+    <div class="mactions">
+      <button class="mbtn s" id="mDemo">Demo Mode</button>
+      <button class="mbtn p" id="mRetry">Retry Snapshot</button>
+    </div>
+    <div class="mnote">
+      <strong style="color:var(--tx)">Snapshot refresh:</strong> the GitHub Action runs every Tuesday 06:00 UTC. Tuesday morning is when airlines typically push fare sales for the upcoming week, so this catches the freshest weekly cycle.<br><br>
+      To force refresh: open your repo &rarr; Actions &rarr; "Refresh flight data" &rarr; Run workflow.<br><br>
+      Place <code>flight-data.json</code> next to this HTML file on your server (or let the Action commit it automatically).
+    </div>
+  </div>
+</div>
+
+<header>
+  <div class="logo"><div class="logo-orb"></div>FlightCompass</div>
+  <div class="h-sep"></div>
+  <input class="h-field origin" id="hOrigin" placeholder="BKK or city" value="BKK">
+  <input type="date" class="h-field" id="hMonth" title="Departure date (optional). Snapshot has fares for various dates Aviasales recently cached \u2014 enable flex mode for adjacent-month matches." style="width:140px">
+  <label class="h-field" id="hFlex" style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none" title="The snapshot has the cheapest fares Aviasales has seen recently across various dates. Flex matches the adjacent months too \u2014 useful because the snapshot may not contain your exact selected date.">
+    <input type="checkbox" id="hFlexChk" style="margin:0;accent-color:var(--cy)"> ± flex <span style="opacity:.55;font-size:9px">(±1 month)</span>
+  </label>
+  <div class="h-spacer"></div>
+  <button class="h-btn primary" id="hSearch">SEARCH</button>
+</header>
+
+<div class="statusbar">
+  <div class="sdot" id="sDot"></div>
+  <span id="sStatus">Ready</span>
+  <span id="sSource"></span>
+</div>
+
+<div id="originBanner" style="display:none;padding:8px 20px;background:rgba(255,200,87,.08);border-bottom:1px solid rgba(255,200,87,.2);font-family:'DM Mono',monospace;font-size:10px;color:var(--mt);line-height:1.5"></div>
+<div class="bc" id="bc"></div>
+
+<div class="main">
+  <div class="mapwrap" id="mapwrap">
+    <svg id="msvg"></svg>
+    <div class="ldover" id="ldover"><div class="ld-spin"></div><div class="ldmsg" id="ldmsg"></div></div>
+    <div class="tt" id="tt"></div>
+  </div>
+  <div class="sb">
+    <div class="sbh">
+      <div class="sbey" id="sbEye">CHEAPEST DESTINATIONS</div>
+      <div class="sbt" id="sbTit">From BKK</div>
+      <div class="sbm" id="sbMet">Initialising...</div>
+    </div>
+    <div class="sbl" id="sbl"></div>
+    <div class="dp" id="dp" style="display:none"></div>
+  </div>
+</div>
+
+<div id="footer" style="position:fixed;bottom:0;left:0;right:0;background:rgba(4,8,15,.97);border-top:1px solid var(--bd);padding:6px 20px;display:flex;align-items:center;gap:14px;font-family:'DM Mono',monospace;font-size:9px;color:var(--mt);z-index:30">
+  <span style="color:var(--cy);font-weight:700;letter-spacing:.3px">FLIGHTCOMPASS</span>
+  <span style="opacity:.6">© 2026 Felix Diego Langer</span>
+  <a href="https://www.linkedin.com/in/felix-langer-2a8425168/" target="_blank" rel="noopener" aria-label="Felix Langer on LinkedIn" style="color:var(--cy);text-decoration:none;display:inline-flex;align-items:center;gap:5px;border:1px solid var(--bd);padding:2px 8px;border-radius:3px;transition:border-color .15s" onmouseover="this.style.borderColor='var(--cy)'" onmouseout="this.style.borderColor='var(--bd)'"><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0"><path d="M20.45 20.45h-3.56v-5.57c0-1.33-.02-3.04-1.85-3.04-1.85 0-2.13 1.45-2.13 2.94v5.67H9.35V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13zM7.12 20.45H3.55V9h3.57v11.45zM22.22 0H1.77C.79 0 0 .77 0 1.72v20.56C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.72V1.72C24 .77 23.2 0 22.22 0z"/></svg>LinkedIn</a>
+  <a href="#" id="aboutLink" style="color:var(--mt);text-decoration:none;opacity:.7;transition:opacity .15s;cursor:pointer" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.7'">About / Contact</a><span style="opacity:.5">Research tool — not financial advice</span>
+  <span style="opacity:.5" id="affDisclosure"></span>
+  <span style="margin-left:auto;opacity:.5">Data: <span style="color:var(--mt)">Aviasales</span> (cached, 7d delay) · hand-curated award charts</span>
+</div>
+
+
+<script>
+(function(){
+"use strict";
+
+// ============ AFFILIATE CONFIG ============
+// To activate affiliate links: paste your Travelpayouts marker ID below.
+// Get it from https://www.travelpayouts.com/ -> Tools -> Affiliate links.
+// Leave empty to ship without affiliate links.
+var CFG={
+  marker:"",        // e.g. "123456" — your Travelpayouts marker
+  subid:"flightcompass"  // sub ID for tracking which routes convert
+};
+
+// ============ DEFENSIVE: bail gracefully if D3 didn't load ============
+if(typeof d3==="undefined"||typeof topojson==="undefined"){
+  var ld=document.getElementById("ldover");
+  if(ld){ld.classList.remove("on");}
+  var msg=document.getElementById("ldmsg");
+  if(msg){msg.textContent="";}
+  var s=document.getElementById("sStatus");
+  if(s){s.textContent="Library load failed \u2014 check internet connection";}
+  var sd=document.getElementById("sDot");
+  if(sd){sd.className="sdot demo";}
+  console.error("D3 or TopoJSON not available. Cannot initialise map.");
+  return;
+}
+
+// ============ STATE ============
+var ST={dataMode:"snapshot",mode:"cash",level:"world",continent:null,country:null,countryISO:null,origin:"BKK",originSubstituted:false,originalInput:"",monthFilter:"",exactDate:"",flexDates:false,results:[],geoData:null,mapReady:false,snapshotData:null,snapshotMeta:null};
+var mSVG=null,mG=null,mPROJ=null,mPFN=null;
+var _aps=[];
+
+// ============ FX ============
+var FX={EUR:1,USD:1.08,GBP:0.86,THB:38.4,JPY:163,KRW:1450,SGD:1.46,MYR:5.1,AUD:1.65,NZD:1.78,AED:3.97,HKD:8.44,INR:90.5,CAD:1.47,BRL:5.5,ZAR:20.1,EGP:52,MAD:10.8,KES:140,QAR:3.93,SAR:4.05,VND:26500,IDR:17200,PHP:63,MXN:18.5,RUB:95,CHF:0.96,SEK:11.5,NOK:11.8,DKK:7.45,TWD:35,CNY:7.8};
+var SYM={EUR:"\u20AC",USD:"$",GBP:"\u00A3",THB:"\u0E3F",JPY:"\u00A5",KRW:"\u20A9",SGD:"S$",MYR:"RM",AUD:"A$",NZD:"NZ$",AED:"AED",HKD:"HK$",INR:"\u20B9",CAD:"C$",BRL:"R$",ZAR:"R",EGP:"EGP",MAD:"MAD",KES:"KES",QAR:"QAR",SAR:"SAR",VND:"\u20AB",IDR:"Rp",PHP:"\u20B1",MXN:"MX$",RUB:"\u20BD",CHF:"CHF",SEK:"kr",NOK:"kr",DKK:"kr",TWD:"NT$",CNY:"\u00A5"};
+
+var NATIVE_CCY={Japan:"JPY","South Korea":"KRW",Vietnam:"VND",Malaysia:"MYR",Indonesia:"IDR",Philippines:"PHP",India:"INR",Singapore:"SGD",UAE:"AED",Qatar:"QAR","Saudi Arabia":"SAR",Australia:"AUD","New Zealand":"NZD",UK:"GBP",Egypt:"EGP",Kenya:"KES",Morocco:"MAD","South Africa":"ZAR",USA:"USD",Canada:"CAD",Mexico:"MXN",Brazil:"BRL",Thailand:"THB",Hong_Kong:"HKD",Taiwan:"TWD",Switzerland:"CHF",Sweden:"SEK",Norway:"NOK",Denmark:"DKK",China:"CNY"};
+var DEST_CCY={Japan:["JPY","USD","EUR"],"South Korea":["KRW","USD","EUR"],Vietnam:["VND","USD","THB"],Malaysia:["MYR","USD","THB"],Singapore:["SGD","USD","THB"],Indonesia:["IDR","USD","THB"],India:["INR","USD","EUR"],Philippines:["PHP","USD","THB"],France:["EUR","GBP","USD"],Germany:["EUR","GBP","USD"],Netherlands:["EUR","GBP","USD"],UK:["GBP","EUR","USD"],Spain:["EUR","GBP","USD"],Italy:["EUR","GBP","USD"],Portugal:["EUR","GBP","USD"],Greece:["EUR","GBP","USD"],Switzerland:["CHF","EUR","USD"],Austria:["EUR","CHF","USD"],Sweden:["SEK","EUR","USD"],Norway:["NOK","EUR","USD"],Denmark:["DKK","EUR","USD"],Australia:["AUD","USD","EUR"],"New Zealand":["NZD","USD","AUD"],UAE:["AED","USD","EUR"],Qatar:["QAR","USD","EUR"],"Saudi Arabia":["SAR","USD","EUR"],Egypt:["EGP","USD","EUR"],Kenya:["KES","USD","EUR"],Morocco:["MAD","USD","EUR"],"South Africa":["ZAR","USD","EUR"],USA:["USD","EUR","GBP"],Canada:["CAD","USD","EUR"],Mexico:["MXN","USD","EUR"],Brazil:["BRL","USD","EUR"],Hong_Kong:["HKD","USD","EUR"],Taiwan:["TWD","USD","EUR"],China:["CNY","USD","EUR"]};
+
+// ============ CASHBACK PLATFORMS ============
+// Highest historical flight cashback rates (May 2026, TH/SG/AU markets).
+// These are STRATEGIC GUIDANCE not live rates. Always verify on ShopBack at booking time.
+var CASHBACK_FLIGHT=[
+  {platform:"Trip.com",        rate:4.0, peak:6.0,  note:"Best for Asia routes. Stacks with airline miles if booked under PNR.", verify:"shopback.com/trip"},
+  {platform:"Kiwi.com",         rate:3.5, peak:5.0,  note:"Good for multi-city and budget carriers. Limited Star Alliance.", verify:"shopback.com/kiwi"},
+  {platform:"Skyscanner",       rate:2.5, peak:4.0,  note:"Compare-only, redirects to airline/OTA \u2014 cashback only triggers on Skyscanner-bookable fares.", verify:"shopback.com/skyscanner"},
+  {platform:"Expedia",          rate:3.0, peak:5.0,  note:"Flights + hotels package tracking unreliable. Book flights separately.", verify:"shopback.com/expedia"},
+  {platform:"Klook (flights)",  rate:2.0, peak:3.5,  note:"Mainly activities, but flight rate decent for Asia LCC.", verify:"shopback.com/klook"}
+];
+// Highest historical hotel cashback rates
+var CASHBACK_HOTEL=[
+  {platform:"Booking.com",  rate:6.0, peak:10.0, note:"Highest historical boosted rate. Widest property selection.", verify:"shopback.com/booking"},
+  {platform:"Agoda",        rate:5.0, peak:8.0,  note:"Strong for TH/MY/SG/JP. Best for boutique hotels in Asia.", verify:"shopback.com/agoda"},
+  {platform:"Hotels.com",   rate:4.5, peak:7.0,  note:"Stacks with their own reward nights (1 free per 10).", verify:"shopback.com/hotels"},
+  {platform:"Trip.com",     rate:5.0, peak:12.0, note:"Best peak rates among Asia OTAs.", verify:"shopback.com/trip"},
+  {platform:"Klook",        rate:5.0, peak:20.0, note:"Boosted for activities, occasionally for hotels in promo periods.", verify:"shopback.com/klook"}
+];
+
+// Strategic top-pick per destination for flight cashback
+function flightCashbackPick(){return CASHBACK_FLIGHT[0];}
+function hotelCashbackPick(country){
+  // Asia destinations: Agoda often more competitive
+  var asiaCountries=["Japan","South Korea","Vietnam","Malaysia","Singapore","Indonesia","Philippines","Thailand","Hong_Kong","Taiwan","China"];
+  if(asiaCountries.indexOf(country)>-1)return CASHBACK_HOTEL[1];
+  return CASHBACK_HOTEL[0];
+}
+
+// ============ MILES AWARD CHARTS ============
+// Hand-curated saver award rates per region. Award space must be verified separately
+// (use AwardLogic, Seats.aero, or call the airline). These are CHART rates, not availability.
+// Format: program -> {region -> {short:#, med:#, long:#}}
+// short=<3000km, med=3000-7000km, long=7000km+
+var AWARD_CHARTS={
+  "Singapore Airlines (KrisFlyer)":{
+    asia:{short:7500,med:13500,long:25000},
+    europe:{short:null,med:null,long:38000},
+    americas:{short:null,med:null,long:43000},
+    oceania:{short:null,med:18500,long:32000},
+    africa:{short:null,med:null,long:43000},
+    middleeast:{short:null,med:15000,long:23000}
+  },
+  "Cathay Pacific (Asia Miles)":{
+    asia:{short:7500,med:12000,long:22000},
+    europe:{short:null,med:null,long:36000},
+    americas:{short:null,med:null,long:42000},
+    oceania:{short:null,med:16500,long:30000},
+    africa:{short:null,med:null,long:40000},
+    middleeast:{short:null,med:14500,long:22000}
+  },
+  "Qatar Privilege Club":{
+    asia:{short:null,med:13000,long:27500},
+    europe:{short:null,med:null,long:33000},
+    americas:{short:null,med:null,long:39500},
+    oceania:{short:null,med:null,long:32500},
+    africa:{short:null,med:13000,long:22000},
+    middleeast:{short:7500,med:13000,long:null}
+  },
+  "Emirates Skywards":{
+    asia:{short:null,med:17500,long:30000},
+    europe:{short:null,med:null,long:42500},
+    americas:{short:null,med:null,long:47500},
+    oceania:{short:null,med:null,long:40000},
+    africa:{short:null,med:15000,long:25000},
+    middleeast:{short:7500,med:15000,long:null}
+  },
+  "Flying Blue (AF/KLM)":{
+    asia:{short:null,med:18500,long:31000},
+    europe:{short:6500,med:17500,long:25000},
+    americas:{short:null,med:null,long:35000},
+    oceania:{short:null,med:null,long:45000},
+    africa:{short:null,med:18500,long:28000},
+    middleeast:{short:null,med:16500,long:null}
+  },
+  "Lufthansa Miles & More":{
+    asia:{short:null,med:25000,long:35000},
+    europe:{short:7000,med:20000,long:30000},
+    americas:{short:null,med:null,long:40000},
+    oceania:{short:null,med:null,long:50000},
+    africa:{short:null,med:20000,long:32000},
+    middleeast:{short:null,med:20000,long:null}
+  },
+  "British Airways Avios":{
+    asia:{short:null,med:25750,long:43000},
+    europe:{short:9000,med:13000,long:25750},
+    americas:{short:null,med:null,long:50000},
+    oceania:{short:null,med:null,long:62500},
+    africa:{short:null,med:20000,long:35000},
+    middleeast:{short:null,med:25750,long:null}
+  },
+  "United MileagePlus":{
+    asia:{short:null,med:null,long:35000},
+    europe:{short:null,med:null,long:33000},
+    americas:{short:12500,med:17500,long:33000},
+    oceania:{short:null,med:null,long:40000},
+    africa:{short:null,med:null,long:45000},
+    middleeast:{short:null,med:null,long:42500}
+  },
+  "ANA Mileage Club":{
+    asia:{short:12000,med:17000,long:30000},
+    europe:{short:null,med:null,long:45000},
+    americas:{short:null,med:null,long:50000},
+    oceania:{short:null,med:null,long:37000},
+    africa:{short:null,med:null,long:55000},
+    middleeast:{short:null,med:20000,long:32000}
+  },
+  "Qantas Frequent Flyer":{
+    asia:{short:null,med:21500,long:41900},
+    europe:{short:null,med:null,long:55200},
+    americas:{short:null,med:null,long:55200},
+    oceania:{short:8000,med:18000,long:41900},
+    africa:{short:null,med:null,long:55200},
+    middleeast:{short:null,med:null,long:41900}
+  }
+};
+
+// Best-program-per-region map: tells us which program to highlight for a given destination
+var BEST_PROGRAM_FOR_REGION={
+  asia:"Cathay Pacific (Asia Miles)",
+  europe:"Flying Blue (AF/KLM)",
+  americas:"United MileagePlus",
+  oceania:"Singapore Airlines (KrisFlyer)",
+  africa:"Qatar Privilege Club",
+  middleeast:"Qatar Privilege Club"
+};
+function continentToRegion(cont){
+  return {Europe:"europe",Asia:"asia",Americas:"americas",Africa:"africa",Oceania:"oceania","Middle East":"middleeast"}[cont]||"asia";
+}
+function distanceTier(km){
+  if(km<3000)return "short";
+  if(km<7000)return "med";
+  return "long";
+}
+function bestSaverForDest(origin,country,dist){
+  var cont=getCountryContinent(country);
+  if(!cont)return null;
+  var region=continentToRegion(cont);
+  var tier=distanceTier(dist||5000);
+  var prog=BEST_PROGRAM_FOR_REGION[region];
+  if(!prog||!AWARD_CHARTS[prog])return null;
+  var pts=AWARD_CHARTS[prog][region]&&AWARD_CHARTS[prog][region][tier];
+  if(!pts)return null;
+  return {program:prog,pts:pts,region:region,tier:tier};
+}
+
+// ============ HOTEL & AMEX DATA ============
+// Hand-curated median 4-star hotel rates per major destination city (EUR/night, May 2026).
+// Sourced from Booking.com listings sampling, not live data. Strategic guidance only.
+var HOTEL_RATES_EUR={
+  // Asia (Felix's region — cheap to mid)
+  "Kuala Lumpur":75,"Ho Chi Minh":62,"Hanoi":58,"Bangkok":68,"Singapore":195,"Manila":92,
+  "Jakarta":78,"Bali":85,"Seoul":135,"Osaka":115,"Tokyo":165,"Hong Kong":210,
+  "Taipei":105,"Mumbai":98,"Delhi":85,"Phnom Penh":52,"Vientiane":48,
+  "Colombo":72,"Kathmandu":55,"Yangon":68,"Beijing":110,
+  // Europe (mid to high)
+  "Paris":180,"Frankfurt":155,"Munich":175,"Berlin":135,"Amsterdam":195,
+  "London":225,"Madrid":140,"Barcelona":155,"Rome":165,"Milan":180,
+  "Lisbon":125,"Athens":110,"Zurich":265,"Vienna":135,"Stockholm":175,
+  "Copenhagen":190,"Helsinki":155,"Dublin":195,"Prague":105,"Budapest":95,
+  "Warsaw":85,"Istanbul":98,
+  // Americas
+  "Los Angeles":215,"San Francisco":245,"New York":295,"Chicago":195,
+  "Miami":225,"Toronto":175,"Mexico City":110,"Sao Paulo":135,
+  "Buenos Aires":105,"Bogota":85,"Lima":95,"Santiago":115,"San Jose":95,
+  // Africa & Middle East
+  "Cairo":68,"Casablanca":82,"Nairobi":98,"Johannesburg":105,
+  "Addis Ababa":75,"Dar es Salaam":85,
+  "Dubai":175,"Abu Dhabi":155,"Doha":165,"Riyadh":135,"Jeddah":125,
+  "Amman":85,"Tel Aviv":195,"Muscat":135,
+  // Oceania
+  "Sydney":215,"Melbourne":185,"Brisbane":155,"Perth":175,
+  "Auckland":165,"Christchurch":135,"Nadi":195
+};
+// Country fallback rates (used when specific city not in table)
+var COUNTRY_RATE_FALLBACK={
+  Malaysia:75,Vietnam:62,Singapore:195,Philippines:92,Indonesia:80,
+  "South Korea":135,Japan:140,Thailand:68,Hong_Kong:210,Taiwan:105,
+  India:90,Cambodia:55,Laos:50,"Sri Lanka":75,Nepal:60,Myanmar:68,China:115,
+  France:180,Germany:155,Netherlands:195,UK:225,Spain:148,Italy:170,
+  Portugal:125,Greece:110,Switzerland:265,Austria:135,Sweden:175,
+  Norway:200,Denmark:190,Finland:155,Ireland:195,"Czech Republic":105,
+  Hungary:95,Poland:85,Turkey:98,
+  USA:225,Canada:175,Mexico:115,Brazil:135,Argentina:105,Colombia:85,
+  Peru:95,Chile:115,"Costa Rica":95,
+  Egypt:68,Morocco:82,Kenya:98,"South Africa":105,Tanzania:85,
+  Ethiopia:75,Rwanda:115,Mauritius:185,
+  UAE:175,Qatar:165,"Saudi Arabia":135,Jordan:85,Israel:195,Oman:135,Kuwait:120,Bahrain:130,
+  Australia:185,"New Zealand":165,Fiji:195
+};
+
+// Amex FHR-eligible destinations (cities likely to have 4-5★ FHR-listed hotels).
+// FHR = Fine Hotels & Resorts. Conservative list of major urban/luxury markets.
+var AMEX_FHR_CITIES={
+  // Asia
+  "Tokyo":true,"Osaka":true,"Kyoto":true,"Seoul":true,"Hong Kong":true,
+  "Bangkok":true,"Phuket":true,"Singapore":true,"Bali":true,"Kuala Lumpur":true,
+  "Mumbai":true,"Delhi":true,"Taipei":true,"Hanoi":true,"Ho Chi Minh":true,
+  "Macau":true,
+  // Europe
+  "Paris":true,"London":true,"Rome":true,"Milan":true,"Florence":true,
+  "Venice":true,"Madrid":true,"Barcelona":true,"Amsterdam":true,
+  "Berlin":true,"Munich":true,"Zurich":true,"Vienna":true,"Lisbon":true,
+  "Prague":true,"Budapest":true,"Athens":true,"Mykonos":true,"Santorini":true,
+  "Istanbul":true,
+  // Americas
+  "New York":true,"Los Angeles":true,"San Francisco":true,"Miami":true,
+  "Chicago":true,"Boston":true,"Washington":true,"Las Vegas":true,
+  "Toronto":true,"Vancouver":true,"Mexico City":true,
+  "Sao Paulo":true,"Rio de Janeiro":true,"Buenos Aires":true,
+  // Middle East
+  "Dubai":true,"Abu Dhabi":true,"Doha":true,"Riyadh":true,"Tel Aviv":true,
+  // Oceania & Africa
+  "Sydney":true,"Melbourne":true,"Auckland":true,"Nadi":true,
+  "Cape Town":true,"Marrakech":true
+};
+
+function getNightlyRate(country,city){
+  if(city&&HOTEL_RATES_EUR[city])return HOTEL_RATES_EUR[city];
+  if(country&&COUNTRY_RATE_FALLBACK[country])return COUNTRY_RATE_FALLBACK[country];
+  return 120; // global median fallback
+}
+function isAmexFHRDest(city){
+  return city&&!!AMEX_FHR_CITIES[city];
+}
+
+
+// ============ DEMO DATA (offline fallback) ============
+var DEMO={
+  overview:{
+    Europe:{cash:395,country:"France",code:"CDG",city:"Paris",stops:0},
+    Asia:{cash:68,country:"Malaysia",code:"KUL",city:"Kuala Lumpur",stops:0},
+    Americas:{cash:645,country:"USA",code:"LAX",city:"Los Angeles",stops:1},
+    Africa:{cash:370,country:"Egypt",code:"CAI",city:"Cairo",stops:1},
+    Oceania:{cash:365,country:"Australia",code:"MEL",city:"Melbourne",stops:1},
+    "Middle East":{cash:180,country:"UAE",code:"DXB",city:"Dubai",stops:0}
+  },
+  countries:{
+    Europe:[
+      {country:"France",iso:"FRA",cash:395,city:"Paris",code:"CDG"},
+      {country:"Germany",iso:"DEU",cash:418,city:"Frankfurt",code:"FRA"},
+      {country:"Netherlands",iso:"NLD",cash:427,city:"Amsterdam",code:"AMS"},
+      {country:"UK",iso:"GBR",cash:448,city:"London",code:"LHR"},
+      {country:"Spain",iso:"ESP",cash:462,city:"Madrid",code:"MAD"},
+      {country:"Switzerland",iso:"CHE",cash:475,city:"Zurich",code:"ZRH"},
+      {country:"Austria",iso:"AUT",cash:485,city:"Vienna",code:"VIE"},
+      {country:"Italy",iso:"ITA",cash:501,city:"Rome",code:"FCO"},
+      {country:"Portugal",iso:"PRT",cash:530,city:"Lisbon",code:"LIS"},
+      {country:"Greece",iso:"GRC",cash:478,city:"Athens",code:"ATH"},
+      {country:"Sweden",iso:"SWE",cash:512,city:"Stockholm",code:"ARN"},
+      {country:"Denmark",iso:"DNK",cash:498,city:"Copenhagen",code:"CPH"},
+      {country:"Czech Republic",iso:"CZE",cash:445,city:"Prague",code:"PRG"},
+      {country:"Turkey",iso:"TUR",cash:385,city:"Istanbul",code:"IST"}
+    ],
+    Asia:[
+      {country:"Malaysia",iso:"MYS",cash:68,city:"Kuala Lumpur",code:"KUL"},
+      {country:"Vietnam",iso:"VNM",cash:78,city:"Ho Chi Minh",code:"SGN"},
+      {country:"Singapore",iso:"SGP",cash:92,city:"Singapore",code:"SIN"},
+      {country:"Philippines",iso:"PHL",cash:105,city:"Manila",code:"MNL"},
+      {country:"Indonesia",iso:"IDN",cash:115,city:"Jakarta",code:"CGK"},
+      {country:"Hong_Kong",iso:"HKG",cash:155,city:"Hong Kong",code:"HKG"},
+      {country:"Taiwan",iso:"TWN",cash:178,city:"Taipei",code:"TPE"},
+      {country:"South Korea",iso:"KOR",cash:172,city:"Seoul",code:"ICN"},
+      {country:"Japan",iso:"JPN",cash:195,city:"Osaka",code:"KIX"},
+      {country:"India",iso:"IND",cash:218,city:"Mumbai",code:"BOM"}
+    ],
+    Americas:[
+      {country:"USA",iso:"USA",cash:645,city:"Los Angeles",code:"LAX"},
+      {country:"Canada",iso:"CAN",cash:695,city:"Toronto",code:"YYZ"},
+      {country:"Mexico",iso:"MEX",cash:740,city:"Mexico City",code:"MEX"},
+      {country:"Brazil",iso:"BRA",cash:810,city:"Sao Paulo",code:"GRU"}
+    ],
+    Africa:[
+      {country:"Egypt",iso:"EGY",cash:370,city:"Cairo",code:"CAI"},
+      {country:"Morocco",iso:"MAR",cash:480,city:"Casablanca",code:"CMN"},
+      {country:"Kenya",iso:"KEN",cash:490,city:"Nairobi",code:"NBO"},
+      {country:"South Africa",iso:"ZAF",cash:570,city:"Johannesburg",code:"JNB"}
+    ],
+    Oceania:[
+      {country:"Australia",iso:"AUS",cash:365,city:"Brisbane",code:"BNE"},
+      {country:"New Zealand",iso:"NZL",cash:448,city:"Auckland",code:"AKL"}
+    ],
+    "Middle East":[
+      {country:"UAE",iso:"ARE",cash:180,city:"Dubai",code:"DXB"},
+      {country:"Qatar",iso:"QAT",cash:205,city:"Doha",code:"DOH"},
+      {country:"Saudi Arabia",iso:"SAU",cash:248,city:"Riyadh",code:"RUH"},
+      {country:"Jordan",iso:"JOR",cash:295,city:"Amman",code:"AMM"}
+    ]
+  }
+};
+
+// ============ GEO ============
+var NUM2ISO={276:"DEU",250:"FRA",826:"GBR",528:"NLD",724:"ESP",380:"ITA",620:"PRT",300:"GRC",752:"SWE",616:"POL",392:"JPN",156:"CHN",356:"IND",410:"KOR",704:"VNM",360:"IDN",764:"THA",458:"MYS",702:"SGP",608:"PHL",840:"USA",124:"CAN",484:"MEX",76:"BRA",32:"ARG",170:"COL",604:"PER",152:"CHL",36:"AUS",554:"NZL",242:"FJI",710:"ZAF",404:"KEN",818:"EGY",504:"MAR",834:"TZA",231:"ETH",646:"RWA",480:"MUS",784:"ARE",634:"QAT",682:"SAU",400:"JOR",376:"ISR",512:"OMN",414:"KWT",48:"BHR",643:"RUS",792:"TUR",40:"AUT",756:"CHE",578:"NOR",208:"DNK",246:"FIN",372:"IRL",348:"HUN",203:"CZE",344:"HKG",158:"TWN",144:"LKA",524:"NPL",116:"KHM",418:"LAO",104:"MMR",188:"CRI",12:"DZA",788:"TUN",686:"SEN",384:"CIV",450:"MDG",800:"UGA",566:"NGA",288:"GHA",690:"SYC",422:"LBN",364:"IRN",31:"AZE",51:"ARM",268:"GEO",144:"LKA",586:"PAK",50:"BGD",524:"NPL",462:"MDV",446:"MAC",496:"MNG",100:"BGR",705:"SVN",191:"HRV",688:"SRB",807:"MKD",8:"ALB",499:"MNE",498:"MDA",428:"LVA",233:"EST",440:"LTU",352:"ISL",442:"LUX",196:"CYP",470:"MLT",56:"BEL",258:"PYF",540:"NCL",598:"PNG",591:"PAN",320:"GTM",222:"SLV",558:"NIC",340:"HND",218:"ECU",862:"VEN",68:"BOL",600:"PRY",858:"URY",192:"CUB",214:"DOM",388:"JAM",533:"ABW",44:"BHS"};
+var ISO2CONT={DEU:"Europe",FRA:"Europe",GBR:"Europe",NLD:"Europe",ESP:"Europe",ITA:"Europe",PRT:"Europe",GRC:"Europe",SWE:"Europe",POL:"Europe",AUT:"Europe",CHE:"Europe",NOR:"Europe",DNK:"Europe",FIN:"Europe",IRL:"Europe",HUN:"Europe",CZE:"Europe",TUR:"Europe",JPN:"Asia",CHN:"Asia",IND:"Asia",KOR:"Asia",VNM:"Asia",IDN:"Asia",THA:"Asia",MYS:"Asia",SGP:"Asia",PHL:"Asia",MMR:"Asia",KHM:"Asia",LAO:"Asia",LKA:"Asia",NPL:"Asia",HKG:"Asia",TWN:"Asia",USA:"Americas",CAN:"Americas",MEX:"Americas",BRA:"Americas",ARG:"Americas",COL:"Americas",PER:"Americas",CHL:"Americas",CRI:"Americas",ZAF:"Africa",KEN:"Africa",ETH:"Africa",EGY:"Africa",MAR:"Africa",TZA:"Africa",RWA:"Africa",MUS:"Africa",AUS:"Oceania",NZL:"Oceania",FJI:"Oceania",ARE:"Middle East",QAT:"Middle East",SAU:"Middle East",KWT:"Middle East",BHR:"Middle East",OMN:"Middle East",JOR:"Middle East",ISR:"Middle East",DZA:"Africa",TUN:"Africa",SEN:"Africa",CIV:"Africa",MDG:"Africa",UGA:"Africa",NGA:"Africa",GHA:"Africa",SYC:"Africa",LBN:"Middle East",IRN:"Middle East",AZE:"Europe",ARM:"Europe",GEO:"Europe",LKA:"Asia",PAK:"Asia",BGD:"Asia",NPL:"Asia",MDV:"Asia",MAC:"Asia",MNG:"Asia",BGR:"Europe",SVN:"Europe",HRV:"Europe",SRB:"Europe",MKD:"Europe",ALB:"Europe",MNE:"Europe",MDA:"Europe",LVA:"Europe",EST:"Europe",LTU:"Europe",ISL:"Europe",LUX:"Europe",CYP:"Europe",MLT:"Europe",BEL:"Europe",PYF:"Oceania",NCL:"Oceania",PNG:"Oceania",PAN:"Americas",GTM:"Americas",SLV:"Americas",NIC:"Americas",HND:"Americas",ECU:"Americas",VEN:"Americas",BOL:"Americas",PRY:"Americas",URY:"Americas",CUB:"Americas",DOM:"Americas",JAM:"Americas",ABW:"Americas",BHS:"Americas"};
+var ISO2NAME={DEU:"Germany",FRA:"France",GBR:"UK",NLD:"Netherlands",ESP:"Spain",ITA:"Italy",PRT:"Portugal",GRC:"Greece",JPN:"Japan",CHN:"China",IND:"India",KOR:"South Korea",VNM:"Vietnam",IDN:"Indonesia",MYS:"Malaysia",SGP:"Singapore",PHL:"Philippines",AUS:"Australia",NZL:"New Zealand",FJI:"Fiji",ZAF:"South Africa",KEN:"Kenya",EGY:"Egypt",MAR:"Morocco",TZA:"Tanzania",ETH:"Ethiopia",RWA:"Rwanda",MUS:"Mauritius",ARE:"UAE",QAT:"Qatar",SAU:"Saudi Arabia",JOR:"Jordan",ISR:"Israel",OMN:"Oman",KWT:"Kuwait",BHR:"Bahrain",USA:"USA",CAN:"Canada",MEX:"Mexico",BRA:"Brazil",ARG:"Argentina",COL:"Colombia",PER:"Peru",CHL:"Chile",CRI:"Costa Rica",CHE:"Switzerland",AUT:"Austria",SWE:"Sweden",NOR:"Norway",DNK:"Denmark",FIN:"Finland",IRL:"Ireland",CZE:"Czech Republic",HUN:"Hungary",POL:"Poland",TUR:"Turkey",LKA:"Sri Lanka",NPL:"Nepal",KHM:"Cambodia",LAO:"Laos",MMR:"Myanmar",HKG:"Hong_Kong",TWN:"Taiwan",DZA:"Algeria",TUN:"Tunisia",SEN:"Senegal",CIV:"Ivory Coast",MDG:"Madagascar",UGA:"Uganda",NGA:"Nigeria",GHA:"Ghana",SYC:"Seychelles",LBN:"Lebanon",IRN:"Iran",AZE:"Azerbaijan",ARM:"Armenia",GEO:"Georgia",LKA:"Sri Lanka",PAK:"Pakistan",BGD:"Bangladesh",NPL:"Nepal",MDV:"Maldives",MAC:"Macau",MNG:"Mongolia",BGR:"Bulgaria",SVN:"Slovenia",HRV:"Croatia",SRB:"Serbia",MKD:"North Macedonia",ALB:"Albania",MNE:"Montenegro",MDA:"Moldova",LVA:"Latvia",EST:"Estonia",LTU:"Lithuania",ISL:"Iceland",LUX:"Luxembourg",CYP:"Cyprus",MLT:"Malta",BEL:"Belgium",PYF:"French Polynesia",NCL:"New Caledonia",PNG:"Papua New Guinea",PAN:"Panama",GTM:"Guatemala",SLV:"El Salvador",NIC:"Nicaragua",HND:"Honduras",ECU:"Ecuador",VEN:"Venezuela",BOL:"Bolivia",PRY:"Paraguay",URY:"Uruguay",CUB:"Cuba",DOM:"Dominican Republic",JAM:"Jamaica",ABW:"Aruba",BHS:"Bahamas"};
+var CCOORDS={France:[2.35,46.2],Germany:[10.45,51.2],Netherlands:[5.29,52.1],UK:[-3.4,55.4],Spain:[-3.75,40.5],Italy:[12.6,41.9],Portugal:[-8.2,39.4],Greece:[21.8,39.1],Switzerland:[8.2,46.8],Austria:[14.5,47.5],Sweden:[18.6,60.1],Norway:[8.5,60.5],Denmark:[10,56],Finland:[26,64],Ireland:[-8,53.5],"Czech Republic":[15.5,49.8],Hungary:[19,47.3],Poland:[19.4,51.9],Turkey:[35.2,38.9],Japan:[138.3,36.2],"South Korea":[127.8,35.9],Vietnam:[108.3,14.1],Indonesia:[113.9,-0.8],Malaysia:[109.7,4.2],Singapore:[103.8,1.35],Philippines:[121.8,12.9],India:[78.9,20.6],Hong_Kong:[114.1,22.4],Taiwan:[121,23.7],China:[104.2,35.9],Australia:[133.8,-25.3],"New Zealand":[174.9,-40.9],Fiji:[178.1,-17.7],"South Africa":[22.9,-30.6],Kenya:[37.9,-0.02],Egypt:[30.8,26.8],Morocco:[-7.1,31.8],Tanzania:[34.9,-6.4],Ethiopia:[40.5,9.1],Rwanda:[29.9,-1.9],Mauritius:[57.5,-20.3],UAE:[53.9,23.4],Qatar:[51.2,25.4],"Saudi Arabia":[45.1,23.9],Jordan:[36.2,30.6],Israel:[34.9,31.1],Oman:[55.9,21.5],Kuwait:[47.5,29.3],Bahrain:[50.6,26.1],USA:[-95.7,37.1],Canada:[-96.8,56.1],Mexico:[-102.6,23.6],Brazil:[-51.9,-14.2],Argentina:[-63.6,-38.4],Colombia:[-74.3,4.6],Peru:[-75,-9.2],Chile:[-71.5,-35.7],"Costa Rica":[-84,9.7],Algeria:[1.66,28.03],Tunisia:[9.54,33.89],Senegal:[-14.45,14.5],"Ivory Coast":[-5.55,7.54],Madagascar:[46.87,-18.77],Uganda:[32.29,1.37],Nigeria:[8.68,9.08],Ghana:[-1.02,7.95],Seychelles:[55.49,-4.68],Lebanon:[35.86,33.85],Iran:[53.69,32.43],Azerbaijan:[47.58,40.14],Armenia:[45,40.07],Georgia:[43.36,42.32],"Sri Lanka":[80.7,7.9],Pakistan:[69.35,30.38],Bangladesh:[90.36,23.68],Nepal:[84.12,28.39],Maldives:[73.22,3.2],Macau:[113.54,22.2],Mongolia:[103.85,46.86],Bulgaria:[25.49,42.73],Slovenia:[14.99,46.15],Croatia:[15.2,45.1],Serbia:[21.01,44.02],"North Macedonia":[21.74,41.61],Albania:[20.17,41.15],Montenegro:[19.37,42.71],Moldova:[28.37,47.41],Latvia:[24.6,56.88],Estonia:[25.01,58.6],Lithuania:[23.88,55.17],Iceland:[-19.02,64.96],Luxembourg:[6.13,49.82],Cyprus:[33.43,35.13],Malta:[14.38,35.94],Belgium:[4.47,50.5],"French Polynesia":[-149.41,-17.68],"New Caledonia":[165.62,-20.9],"Papua New Guinea":[143.96,-6.31],Panama:[-80.78,8.54],Guatemala:[-90.23,15.78],"El Salvador":[-88.92,13.79],Nicaragua:[-85.21,12.87],Honduras:[-86.24,15.2],Ecuador:[-78.18,-1.83],Venezuela:[-66.59,6.42],Bolivia:[-63.59,-16.29],Paraguay:[-58.44,-23.44],Uruguay:[-55.77,-32.52],Cuba:[-77.78,21.52],"Dominican Republic":[-70.16,18.74],Jamaica:[-77.3,18.11],Aruba:[-69.97,12.52],Bahamas:[-76.64,25.03]};
+var ACOORDS={CDG:[2.55,49.01],ORY:[2.36,48.73],FRA:[8.57,50.03],MUC:[11.79,48.35],BER:[13.51,52.37],AMS:[4.76,52.31],LHR:[-0.46,51.48],LGW:[-0.19,51.15],MAN:[-2.27,53.36],MAD:[-3.57,40.47],BCN:[2.07,41.30],FCO:[12.25,41.8],MXP:[8.72,45.63],LIS:[-9.13,38.78],ATH:[23.94,37.94],ZRH:[8.55,47.46],GVA:[6.11,46.24],VIE:[16.57,48.11],ARN:[17.92,59.65],OSL:[11.1,60.19],CPH:[12.65,55.62],HEL:[24.96,60.32],DUB:[-6.27,53.42],PRG:[14.26,50.1],BUD:[19.26,47.43],WAW:[20.97,52.17],IST:[28.74,41.26],SAW:[29.31,40.9],NRT:[140.39,35.77],HND:[139.78,35.55],KIX:[135.43,34.43],FUK:[130.45,33.59],ICN:[126.45,37.46],GMP:[126.79,37.56],BOM:[72.87,19.09],DEL:[77.1,28.55],MAA:[80.17,12.99],BLR:[77.71,13.2],SGN:[106.65,10.82],HAN:[105.81,21.22],CGK:[106.66,-6.13],DPS:[115.17,-8.75],KUL:[101.71,2.75],PEN:[100.27,5.30],SIN:[103.99,1.36],MNL:[121.02,14.51],CEB:[123.98,10.31],HKG:[113.92,22.31],TPE:[121.23,25.08],PEK:[116.59,40.08],PVG:[121.81,31.14],MEL:[144.84,-37.67],SYD:[151.18,-33.94],BNE:[153.12,-27.38],PER:[115.97,-31.94],AKL:[174.79,-36.99],CHC:[172.53,-43.49],NAN:[177.44,-17.76],JNB:[28.23,-26.13],CPT:[18.6,-33.97],NBO:[36.93,-1.32],CAI:[31.41,30.11],CMN:[-7.59,33.37],DAR:[39.2,-6.88],ADD:[38.8,8.97],MRU:[57.68,-20.43],DXB:[55.36,25.25],AUH:[54.64,24.43],DOH:[51.61,25.27],RUH:[46.7,24.96],JED:[39.16,21.68],AMM:[35.99,31.72],TLV:[34.89,32.01],MCT:[58.28,23.59],LAX:[-118.41,33.94],JFK:[-73.78,40.64],SFO:[-122.38,37.62],ORD:[-87.91,41.97],MIA:[-80.29,25.79],SEA:[-122.31,47.45],YYZ:[-79.63,43.68],YVR:[-123.18,49.19],MEX:[-99.07,19.44],GRU:[-46.47,-23.43],EZE:[-58.54,-34.82],SCL:[-70.79,-33.39],LIM:[-77.11,-12.02],BOG:[-74.15,4.7],SJO:[-84.21,9.99],BKK:[100.75,13.69],HKT:[98.31,8.11],CNX:[98.97,18.77],DAM:[36.51,33.41],TLV:[34.89,32.01],BEY:[35.49,33.82],GYD:[50.05,40.47],EVN:[44.4,40.15],TBS:[44.95,41.67],IKA:[51.15,35.42],CMB:[79.88,7.18],KTM:[85.36,27.7],DAC:[90.4,23.84],KHI:[67.16,24.91],ISB:[72.82,33.62],LHE:[74.4,31.52],MLE:[73.53,4.19],OKA:[127.65,26.2],ITM:[135.44,34.79],KOJ:[130.72,31.8],CJU:[126.49,33.51],SHA:[121.34,31.2],CTU:[103.95,30.58],CKG:[106.64,29.72],SZX:[113.81,22.64],XIY:[108.75,34.45],HGH:[120.43,30.23],WUH:[114.21,30.78],NKG:[118.86,31.74],KHH:[120.35,22.58],TSA:[121.55,25.07],MFM:[113.59,22.15],ULN:[106.77,47.84],CCU:[88.45,22.65],AMD:[72.63,23.08],COK:[76.39,10.15],PNQ:[73.92,18.58],JAI:[75.81,26.83],SAI:[103.81,11.42],MDL:[95.98,21.7],HKT:[98.31,8.11],CNX:[98.97,18.77],USM:[100.06,9.55],DMK:[100.61,13.91],CXR:[109.22,12.23],PQC:[103.99,10.23],MES:[98.67,3.64],JOG:[110.43,-7.79],BKI:[116.05,5.93],KCH:[110.34,1.48],LGK:[99.72,6.33],DVO:[125.65,7.13],ILO:[122.49,10.83],PER:[115.97,-31.94],ADL:[138.53,-34.94],OOL:[153.5,-28.16],CNS:[145.75,-16.88],CBR:[149.19,-35.31],HBA:[147.51,-42.83],DRW:[130.87,-12.41],WLG:[174.81,-41.33],ZQN:[168.74,-45.02],SUV:[178.56,-18.05],PPT:[-149.61,-17.55],NOU:[166.21,-22.27],POM:[147.22,-9.44],MBA:[39.59,-4.03],HRG:[33.79,27.18],SSH:[34.39,27.98],LXR:[32.7,25.67],RAK:[-8.03,31.61],AGA:[-9.41,30.33],JRO:[37.07,-3.43],ABV:[7.27,9.01],ACC:[-0.17,5.61],EBB:[32.44,0.04],SEZ:[55.52,-4.67],ALG:[3.21,36.69],TUN:[10.23,36.85],DKR:[-17.07,14.74],ABJ:[-3.93,5.26],TNR:[47.48,-18.8],DMM:[49.79,26.47],MED:[39.7,24.55],AQJ:[35,29.55],SLL:[58.28,23.59],PHX:[-112.01,33.43],DEN:[-104.67,39.86],ATL:[-84.43,33.64],IAD:[-77.46,38.95],MCO:[-81.31,28.43],PHL:[-75.24,39.87],DTW:[-83.35,42.21],MSP:[-93.22,44.88],CLT:[-80.93,35.21],HNL:[-157.92,21.32],AUS:[-97.67,30.19],PDX:[-122.6,45.59],SAN:[-117.19,32.73],SLC:[-111.98,40.79],FLL:[-80.15,26.07],TPA:[-82.53,27.98],BWI:[-76.67,39.18],DCA:[-77.04,38.85],MDW:[-87.75,41.79],YYC:[-114.01,51.12],YEG:[-113.58,53.31],YOW:[-75.67,45.32],YHZ:[-63.51,44.88],PVR:[-105.25,20.68],MTY:[-100.11,25.78],GDL:[-103.31,20.52],CUN:[-86.87,21.04],HAV:[-82.41,22.99],PUJ:[-68.36,18.57],SDQ:[-69.67,18.43],NAS:[-77.47,25.04],MBJ:[-77.91,18.5],AUA:[-70.02,12.5],PTY:[-79.39,8.97],GUA:[-90.53,14.58],SAL:[-89.06,13.44],MGA:[-86.17,12.14],TGU:[-87.22,14.06],SSA:[-38.32,-12.91],REC:[-34.92,-8.13],BSB:[-47.92,-15.87],CGH:[-46.66,-23.63],AEP:[-58.42,-34.56],CUZ:[-71.94,-13.54],MDE:[-75.59,6.16],UIO:[-78.36,-0.13],GYE:[-79.88,-2.16],CCS:[-66.99,10.6],LPB:[-68.18,-16.51],ASU:[-57.52,-25.24],MVD:[-56.03,-34.83],ARN:[17.92,59.65],GOT:[12.28,57.66],MMX:[13.37,55.54],BGO:[5.22,60.29],TRD:[10.92,63.46],AAL:[9.85,57.09],BLL:[9.15,55.74],EIN:[5.37,51.45],RTM:[4.43,51.96],BRU:[4.48,50.9],LUX:[6.21,49.62],KEF:[-22.62,63.99],RIX:[23.97,56.92],TLL:[24.83,59.41],VNO:[25.29,54.63],ORK:[-8.49,51.84],SNN:[-8.92,52.7],TIA:[19.72,41.41],TIV:[18.72,42.4],DBV:[18.27,42.56],SPU:[16.3,43.54],ZAG:[16.07,45.74],LJU:[14.46,46.22],BEG:[20.31,44.82],SKP:[21.62,41.96],SOF:[23.41,42.69],OTP:[26.09,44.57],KIV:[28.93,46.93],LCA:[33.62,34.87],MLA:[14.49,35.86],KRK:[19.79,50.07],GDN:[18.47,54.38],LYS:[5.09,45.73],TLS:[1.36,43.63],BOD:[-0.71,44.83],NTE:[-1.61,47.16],MPL:[3.96,43.58],BIQ:[-1.53,43.46],MRS:[5.21,43.44],STR:[9.22,48.69],HAJ:[9.69,52.46],NUE:[11.08,49.5],LEJ:[12.24,51.42],SVQ:[-5.89,37.42],BIO:[-2.91,43.31],ALC:[-0.56,38.28],TFS:[-16.57,28.04],LPA:[-15.39,27.93],IBZ:[1.37,38.87],FAO:[-7.97,37.01],FNC:[-16.78,32.69],HER:[25.18,35.34],JTR:[25.48,36.4],JMK:[25.35,37.43],SKG:[22.97,40.52],RHO:[28.09,36.41],CFU:[19.91,39.6],FLR:[11.21,43.81],BLQ:[11.29,44.53],PMO:[13.09,38.18],CTA:[15.07,37.47],BRI:[16.76,41.14],VRN:[10.89,45.4],CAG:[9.06,39.25],BSL:[7.53,47.59],SZG:[13.0,47.79],INN:[11.34,47.26],AYT:[30.79,36.9],ADB:[27.16,38.29],ESB:[32.99,40.13],SAW:[29.31,40.9]};
+var IATA_TO_COUNTRY={
+// France
+CDG:"France",ORY:"France",NCE:"France",MRS:"France",LYS:"France",TLS:"France",BOD:"France",NTE:"France",MPL:"France",BIQ:"France",
+// Germany
+FRA:"Germany",MUC:"Germany",BER:"Germany",HAM:"Germany",DUS:"Germany",CGN:"Germany",STR:"Germany",HAJ:"Germany",NUE:"Germany",LEJ:"Germany",
+// Netherlands
+AMS:"Netherlands",RTM:"Netherlands",EIN:"Netherlands",
+// UK
+LHR:"UK",LGW:"UK",MAN:"UK",STN:"UK",LTN:"UK",EDI:"UK",BHX:"UK",GLA:"UK",BRS:"UK",LCY:"UK",LPL:"UK",NCL:"UK",ABZ:"UK",BFS:"UK",
+// Spain
+MAD:"Spain",BCN:"Spain",PMI:"Spain",AGP:"Spain",VLC:"Spain",ALC:"Spain",SVQ:"Spain",BIO:"Spain",TFS:"Spain",LPA:"Spain",IBZ:"Spain",
+// Italy
+FCO:"Italy",MXP:"Italy",VCE:"Italy",NAP:"Italy",BLQ:"Italy",CTA:"Italy",PMO:"Italy",BRI:"Italy",FLR:"Italy",VRN:"Italy",CAG:"Italy",
+// Portugal
+LIS:"Portugal",OPO:"Portugal",FAO:"Portugal",FNC:"Portugal",
+// Greece
+ATH:"Greece",HER:"Greece",JTR:"Greece",JMK:"Greece",SKG:"Greece",RHO:"Greece",CFU:"Greece",
+// Other Europe
+ZRH:"Switzerland",GVA:"Switzerland",BSL:"Switzerland",
+VIE:"Austria",SZG:"Austria",INN:"Austria",
+BRU:"Belgium",
+ARN:"Sweden",GOT:"Sweden",MMX:"Sweden",
+OSL:"Norway",BGO:"Norway",TRD:"Norway",
+CPH:"Denmark",AAL:"Denmark",BLL:"Denmark",
+HEL:"Finland",
+DUB:"Ireland",ORK:"Ireland",SNN:"Ireland",
+PRG:"Czech Republic",BUD:"Hungary",WAW:"Poland",KRK:"Poland",GDN:"Poland",
+OTP:"Romania",SOF:"Bulgaria",
+LJU:"Slovenia",ZAG:"Croatia",DBV:"Croatia",SPU:"Croatia",
+BEG:"Serbia",SKP:"North Macedonia",TIA:"Albania",
+RIX:"Latvia",TLL:"Estonia",VNO:"Lithuania",
+KEF:"Iceland",
+IST:"Turkey",SAW:"Turkey",AYT:"Turkey",ADB:"Turkey",ESB:"Turkey",
+LCA:"Cyprus",MLA:"Malta",
+LUX:"Luxembourg",
+TIV:"Montenegro",
+KIV:"Moldova",
+// Asia - East
+NRT:"Japan",HND:"Japan",KIX:"Japan",NGO:"Japan",FUK:"Japan",CTS:"Japan",OKA:"Japan",ITM:"Japan",KOJ:"Japan",
+ICN:"South Korea",GMP:"South Korea",PUS:"South Korea",CJU:"South Korea",
+PEK:"China",PVG:"China",CAN:"China",SHA:"China",CTU:"China",CKG:"China",SZX:"China",XIY:"China",HGH:"China",WUH:"China",NKG:"China",
+HKG:"Hong_Kong",
+TPE:"Taiwan",KHH:"Taiwan",TSA:"Taiwan",
+MFM:"Macau",
+ULN:"Mongolia",
+// Asia - South
+BOM:"India",DEL:"India",MAA:"India",BLR:"India",HYD:"India",GOI:"India",CCU:"India",AMD:"India",COK:"India",PNQ:"India",JAI:"India",
+CMB:"Sri Lanka",KTM:"Nepal",DAC:"Bangladesh",
+KHI:"Pakistan",ISB:"Pakistan",LHE:"Pakistan",
+MLE:"Maldives",
+// Asia - Southeast
+SGN:"Vietnam",HAN:"Vietnam",DAD:"Vietnam",CXR:"Vietnam",PQC:"Vietnam",
+CGK:"Indonesia",DPS:"Indonesia",SUB:"Indonesia",JOG:"Indonesia",MES:"Indonesia",
+KUL:"Malaysia",PEN:"Malaysia",JHB:"Malaysia",LGK:"Malaysia",BKI:"Malaysia",KCH:"Malaysia",
+SIN:"Singapore",
+MNL:"Philippines",CEB:"Philippines",CRK:"Philippines",DVO:"Philippines",ILO:"Philippines",
+PNH:"Cambodia",REP:"Cambodia",SAI:"Cambodia",
+VTE:"Laos",LPQ:"Laos",
+RGN:"Myanmar",MDL:"Myanmar",
+BKK:"Thailand",HKT:"Thailand",CNX:"Thailand",USM:"Thailand",DMK:"Thailand",
+// Oceania
+MEL:"Australia",SYD:"Australia",BNE:"Australia",PER:"Australia",ADL:"Australia",OOL:"Australia",CNS:"Australia",CBR:"Australia",HBA:"Australia",DRW:"Australia",
+AKL:"New Zealand",CHC:"New Zealand",WLG:"New Zealand",ZQN:"New Zealand",
+NAN:"Fiji",SUV:"Fiji",
+PPT:"French Polynesia",NOU:"New Caledonia",
+POM:"Papua New Guinea",
+// Africa
+JNB:"South Africa",CPT:"South Africa",DUR:"South Africa",
+NBO:"Kenya",MBA:"Kenya",
+CAI:"Egypt",HRG:"Egypt",SSH:"Egypt",LXR:"Egypt",
+CMN:"Morocco",RAK:"Morocco",AGA:"Morocco",
+DAR:"Tanzania",ZNZ:"Tanzania",JRO:"Tanzania",
+ADD:"Ethiopia",
+LOS:"Nigeria",ABV:"Nigeria",
+ACC:"Ghana",
+KGL:"Rwanda",EBB:"Uganda",
+MRU:"Mauritius",SEZ:"Seychelles",
+ALG:"Algeria",TUN:"Tunisia",
+DKR:"Senegal",ABJ:"Ivory Coast",
+TNR:"Madagascar",
+// Middle East
+DXB:"UAE",AUH:"UAE",SHJ:"UAE",
+DOH:"Qatar",
+RUH:"Saudi Arabia",JED:"Saudi Arabia",DMM:"Saudi Arabia",MED:"Saudi Arabia",
+AMM:"Jordan",AQJ:"Jordan",
+TLV:"Israel",
+MCT:"Oman",SLL:"Oman",
+KWI:"Kuwait",BAH:"Bahrain",
+BEY:"Lebanon",
+GYD:"Azerbaijan",EVN:"Armenia",TBS:"Georgia",
+IKA:"Iran",
+// North America
+LAX:"USA",JFK:"USA",SFO:"USA",ORD:"USA",MIA:"USA",SEA:"USA",DFW:"USA",IAH:"USA",LAS:"USA",BOS:"USA",ATL:"USA",DEN:"USA",PHX:"USA",IAD:"USA",MCO:"USA",PHL:"USA",DTW:"USA",MSP:"USA",CLT:"USA",HNL:"USA",AUS:"USA",PDX:"USA",SAN:"USA",SLC:"USA",FLL:"USA",TPA:"USA",BWI:"USA",DCA:"USA",MDW:"USA",
+YYZ:"Canada",YVR:"Canada",YUL:"Canada",YYC:"Canada",YEG:"Canada",YOW:"Canada",YHZ:"Canada",
+MEX:"Mexico",CUN:"Mexico",GDL:"Mexico",MTY:"Mexico",SJD:"Mexico",PVR:"Mexico",
+HAV:"Cuba",PUJ:"Dominican Republic",SDQ:"Dominican Republic",NAS:"Bahamas",MBJ:"Jamaica",AUA:"Aruba",
+// Central & South America
+SJO:"Costa Rica",PTY:"Panama",GUA:"Guatemala",SAL:"El Salvador",MGA:"Nicaragua",TGU:"Honduras",
+GRU:"Brazil",GIG:"Brazil",FOR:"Brazil",SSA:"Brazil",REC:"Brazil",BSB:"Brazil",CGH:"Brazil",
+EZE:"Argentina",AEP:"Argentina",
+SCL:"Chile",
+LIM:"Peru",CUZ:"Peru",
+BOG:"Colombia",CTG:"Colombia",MDE:"Colombia",
+UIO:"Ecuador",GYE:"Ecuador",
+CCS:"Venezuela",
+LPB:"Bolivia",ASU:"Paraguay",MVD:"Uruguay"
+};
+
+
+// City name -> primary IATA mapping for friendly origin input
+var CITY_TO_IATA={
+  "bangkok":"BKK","singapore":"SIN","kuala lumpur":"KUL","jakarta":"CGK","bali":"DPS",
+  "denpasar":"DPS","manila":"MNL","hong kong":"HKG","taipei":"TPE","seoul":"ICN",
+  "tokyo":"NRT","osaka":"KIX","mumbai":"BOM","delhi":"DEL","new delhi":"DEL",
+  "ho chi minh":"SGN","saigon":"SGN","hanoi":"HAN","phnom penh":"PNH","vientiane":"VTE",
+  "yangon":"RGN","colombo":"CMB","kathmandu":"KTM","beijing":"PEK","shanghai":"PVG",
+  "london":"LHR","paris":"CDG","frankfurt":"FRA","munich":"MUC","berlin":"BER",
+  "amsterdam":"AMS","madrid":"MAD","barcelona":"BCN","rome":"FCO","milan":"MXP",
+  "lisbon":"LIS","athens":"ATH","zurich":"ZRH","geneva":"GVA","vienna":"VIE",
+  "stockholm":"ARN","copenhagen":"CPH","oslo":"OSL","helsinki":"HEL","dublin":"DUB",
+  "prague":"PRG","budapest":"BUD","warsaw":"WAW","istanbul":"IST",
+  "dubai":"DXB","abu dhabi":"AUH","doha":"DOH","riyadh":"RUH","jeddah":"JED",
+  "amman":"AMM","tel aviv":"TLV","muscat":"MCT","kuwait":"KWI","manama":"BAH",
+  "cairo":"CAI","casablanca":"CMN","marrakech":"RAK","nairobi":"NBO",
+  "addis ababa":"ADD","johannesburg":"JNB","cape town":"CPT","dar es salaam":"DAR",
+  "los angeles":"LAX","new york":"JFK","san francisco":"SFO","chicago":"ORD",
+  "miami":"MIA","seattle":"SEA","toronto":"YYZ","vancouver":"YVR","mexico city":"MEX",
+  "sao paulo":"GRU","rio":"GIG","buenos aires":"EZE","santiago":"SCL","lima":"LIM",
+  "bogota":"BOG","sydney":"SYD","melbourne":"MEL","brisbane":"BNE","perth":"PER",
+  "auckland":"AKL","wellington":"WLG","christchurch":"CHC","nadi":"NAN"
+};
+// Build reverse map: IATA -> primary city name (title-cased)
+// Avoids duplicate entries by keeping first occurrence (CITY_TO_IATA is order-meaningful)
+var IATA_TO_CITY=(function(){
+  var m={};
+  for(var city in CITY_TO_IATA){
+    var iata=CITY_TO_IATA[city];
+    if(!m[iata]){
+      // Title-case: "ho chi minh" -> "Ho Chi Minh"
+      m[iata]=city.replace(/\b\w/g,function(c){return c.toUpperCase();});
+    }
+  }
+  // Manual overrides where the first match isn't the preferred display name
+  m["DEL"]="Delhi"; m["NRT"]="Tokyo"; m["HND"]="Tokyo";
+  m["IST"]="Istanbul"; m["SAW"]="Istanbul";
+  m["LHR"]="London"; m["LGW"]="London";
+  m["CDG"]="Paris"; m["ORY"]="Paris";
+  m["FCO"]="Rome"; m["MXP"]="Milan";
+  m["JFK"]="New York"; m["LAX"]="Los Angeles"; m["SFO"]="San Francisco";
+  m["GIG"]="Rio de Janeiro"; m["GRU"]="Sao Paulo";
+  m["DPS"]="Denpasar (Bali)";
+  m["PEK"]="Beijing"; m["PVG"]="Shanghai";
+  m["CAN"]="Guangzhou"; m["SZX"]="Shenzhen";
+  m["BLR"]="Bangalore"; m["BOM"]="Mumbai";
+  m["ICN"]="Seoul"; m["KIX"]="Osaka";
+  m["MNL"]="Manila"; m["HKG"]="Hong Kong"; m["TPE"]="Taipei";
+  m["KUL"]="Kuala Lumpur"; m["SGN"]="Ho Chi Minh"; m["HAN"]="Hanoi";
+  m["CGK"]="Jakarta"; m["SIN"]="Singapore"; m["BKK"]="Bangkok";
+  m["DXB"]="Dubai"; m["DOH"]="Doha"; m["AUH"]="Abu Dhabi"; m["RUH"]="Riyadh";
+  m["FRA"]="Frankfurt"; m["MUC"]="Munich"; m["BER"]="Berlin"; m["AMS"]="Amsterdam";
+  m["MAD"]="Madrid"; m["BCN"]="Barcelona"; m["ZRH"]="Zurich"; m["VIE"]="Vienna";
+  m["ATH"]="Athens"; m["ORD"]="Chicago"; m["MIA"]="Miami"; m["DFW"]="Dallas";
+  m["YYZ"]="Toronto"; m["SYD"]="Sydney"; m["MEL"]="Melbourne"; m["AKL"]="Auckland";
+  m["JNB"]="Johannesburg"; m["CPT"]="Cape Town"; m["CAI"]="Cairo"; m["NBO"]="Nairobi";
+  m["EZE"]="Buenos Aires"; m["MEX"]="Mexico City"; m["BOG"]="Bogota";
+  // Secondary destinations (also possible to appear in snapshot data)
+  m["NAP"]="Naples"; m["PMI"]="Palma"; m["JTR"]="Santorini"; m["OPO"]="Porto";
+  m["LIS"]="Lisbon"; m["ARN"]="Stockholm"; m["CPH"]="Copenhagen"; m["OSL"]="Oslo";
+  m["HEL"]="Helsinki"; m["DUB"]="Dublin"; m["PRG"]="Prague"; m["BUD"]="Budapest";
+  m["WAW"]="Warsaw"; m["JED"]="Jeddah"; m["AMM"]="Amman"; m["TLV"]="Tel Aviv";
+  m["MCT"]="Muscat"; m["KWI"]="Kuwait City"; m["BAH"]="Manama"; m["CMN"]="Casablanca";
+  m["ADD"]="Addis Ababa"; m["DAR"]="Dar es Salaam"; m["MRU"]="Port Louis";
+  m["SEA"]="Seattle"; m["YVR"]="Vancouver"; m["CUN"]="Cancun"; m["SCL"]="Santiago";
+  m["LIM"]="Lima"; m["BNE"]="Brisbane"; m["PER"]="Perth"; m["CHC"]="Christchurch";
+  m["NAN"]="Nadi"; m["MFM"]="Macau"; m["HKT"]="Phuket"; m["DAD"]="Da Nang";
+  m["CXR"]="Nha Trang"; m["REP"]="Siem Reap"; m["PNH"]="Phnom Penh";
+  m["RGN"]="Yangon"; m["CMB"]="Colombo"; m["KTM"]="Kathmandu";
+  return m;
+})();
+function iataToCity(iata){
+  if(!iata)return "";
+  return IATA_TO_CITY[iata.toUpperCase()]||iata;
+}
+// Nearest snapshot-origin for unsupported origins (city -> fallback IATA in snapshot)
+var NEAREST_HUB={
+  // Nice, Lyon, Marseille -> Paris
+  "nice":"CDG","lyon":"CDG","marseille":"CDG","bordeaux":"CDG","toulouse":"CDG",
+  // German secondary
+  "hamburg":"FRA","dusseldorf":"FRA","cologne":"FRA","stuttgart":"FRA","hanover":"FRA","nuremberg":"FRA",
+  // UK secondary
+  "manchester":"LHR","edinburgh":"LHR","birmingham":"LHR","glasgow":"LHR",
+  // Italian secondary
+  "venice":"FCO","florence":"FCO","bologna":"FCO","naples":"FCO","catania":"FCO","palermo":"FCO",
+  // Spanish secondary
+  "valencia":"MAD","seville":"MAD","bilbao":"MAD","malaga":"MAD","alicante":"MAD","tenerife":"MAD","las palmas":"MAD",
+  // Other European secondary
+  "geneva":"ZRH","stockholm":"FRA","oslo":"FRA","copenhagen":"FRA","helsinki":"FRA","dublin":"LHR",
+  "prague":"VIE","budapest":"VIE","warsaw":"FRA","krakow":"FRA","bucharest":"VIE","sofia":"VIE",
+  "lisbon":"MAD","porto":"MAD",
+  // SEA secondary
+  "phuket":"BKK","chiang mai":"BKK","penang":"KUL","cebu":"MNL","yogyakarta":"CGK","surabaya":"CGK","danang":"SGN",
+  // Greater China secondary
+  "macau":"HKG","kaohsiung":"TPE","chengdu":"PEK","chongqing":"PEK","xian":"PEK","wuhan":"PEK","nanjing":"PVG","hangzhou":"PVG",
+  // Japan secondary
+  "fukuoka":"KIX","nagoya":"KIX","sapporo":"NRT","okinawa":"KIX",
+  // India secondary
+  "chennai":"BOM","hyderabad":"BOM","kolkata":"DEL","ahmedabad":"BOM","kochi":"BOM","goa":"BOM","pune":"BOM",
+  // North America secondary
+  "seattle":"LAX","portland":"LAX","las vegas":"LAX","san diego":"LAX","denver":"LAX",
+  "boston":"JFK","washington":"JFK","philadelphia":"JFK","atlanta":"MIA","houston":"DFW","austin":"DFW",
+  "vancouver":"LAX","montreal":"YYZ","calgary":"YYZ",
+  // Australia secondary
+  "perth":"SYD","adelaide":"MEL","brisbane":"SYD","gold coast":"SYD","cairns":"SYD","hobart":"MEL","darwin":"SYD",
+  "wellington":"AKL","christchurch":"AKL","queenstown":"AKL"
+};
+// Snapshot-eligible origins (must match DEFAULT_ORIGINS in fetch_snapshot.py)
+var SNAPSHOT_ORIGINS={"BKK":1,"SIN":1,"KUL":1,"CGK":1,"MNL":1,"DPS":1,"SGN":1,"HAN":1,
+  "HKG":1,"TPE":1,"ICN":1,"NRT":1,"HND":1,"KIX":1,"PEK":1,"PVG":1,"CAN":1,"SZX":1,
+  "BOM":1,"DEL":1,"BLR":1,"DXB":1,"DOH":1,"AUH":1,"RUH":1,
+  "LHR":1,"LGW":1,"CDG":1,"ORY":1,"FRA":1,"MUC":1,"BER":1,"AMS":1,"MAD":1,"BCN":1,
+  "FCO":1,"MXP":1,"ZRH":1,"VIE":1,"IST":1,"ATH":1,
+  "LAX":1,"JFK":1,"SFO":1,"ORD":1,"MIA":1,"DFW":1,"YYZ":1,
+  "SYD":1,"MEL":1,"AKL":1,"JNB":1,"CPT":1,"CAI":1,"NBO":1,
+  "GRU":1,"GIG":1,"EZE":1,"MEX":1,"BOG":1};
+
+// Resolver returns {iata, substituted, originalInput} so we can show banner
+function resolveOriginInput(raw){
+  if(!raw)return {iata:"BKK",substituted:false,originalInput:""};
+  var clean=raw.trim().toLowerCase();
+  var input=raw.trim();
+  // Try exact city match
+  if(CITY_TO_IATA[clean]){
+    var iata=CITY_TO_IATA[clean];
+    return {iata:iata,substituted:false,originalInput:input};
+  }
+  // Try uppercase 3-letter IATA
+  var iataInput=raw.trim().toUpperCase().replace(/[^A-Z]/g,"");
+  if(iataInput.length===3&&ACOORDS[iataInput]){
+    // If not in snapshot, try nearest-hub map by reverse-looking-up city
+    if(!SNAPSHOT_ORIGINS[iataInput]){
+      // Direct IATA not in snapshot — check if there's a nearest hub
+      // Walk CITY_TO_IATA to find original city name for this IATA
+      var cityKey=null;
+      for(var k in CITY_TO_IATA){if(CITY_TO_IATA[k]===iataInput){cityKey=k;break;}}
+      if(cityKey&&NEAREST_HUB[cityKey]){
+        return {iata:NEAREST_HUB[cityKey],substituted:true,originalInput:iataInput};
+      }
+    }
+    return {iata:iataInput,substituted:false,originalInput:input};
+  }
+  // Try nearest-hub map for non-snapshot cities
+  if(NEAREST_HUB[clean]){
+    return {iata:NEAREST_HUB[clean],substituted:true,originalInput:input};
+  }
+  // Try partial city match
+  var keys=Object.keys(CITY_TO_IATA);
+  for(var i=0;i<keys.length;i++){
+    if(keys[i].indexOf(clean)===0)return {iata:CITY_TO_IATA[keys[i]],substituted:false,originalInput:input};
+  }
+  // Fallback
+  return {iata:(iataInput||"BKK").slice(0,3),substituted:false,originalInput:input};
+}
+
+function getCountryContinent(country){
+  for(var k in ISO2NAME){if(ISO2NAME[k]===country)return ISO2CONT[k];}
+  return null;
+}
+function getCountryISO(country){
+  for(var k in ISO2NAME){if(ISO2NAME[k]===country)return k;}
+  return null;
+}
+
+// ============ HELPERS ============
+function gi(id){return document.getElementById(id);}
+
+// ============ AFFILIATE LINK BUILDER ============
+// Builds Aviasales deep search URL with affiliate marker for given route + date.
+// Returns null if no marker configured (so the button just won't render).
+function buildAviasalesURL(origin,dest,departDate,returnDate){
+  if(!CFG.marker)return null;
+  // Format: https://www.aviasales.com/search/{ORIG}{DD}{MM}{DEST}{DD}{MM}
+  // If no dates: send to general search prefill
+  function fmtDate(s){
+    if(!s||s.length<10)return "";
+    // s is YYYY-MM-DD -> DDMM
+    return s.substring(8,10)+s.substring(5,7);
+  }
+  var dStr=fmtDate(departDate),rStr=fmtDate(returnDate);
+  var path;
+  if(dStr&&rStr){
+    path="/search/"+origin+dStr+dest+rStr;
+  } else if(dStr){
+    path="/search/"+origin+dStr+dest;
+  } else {
+    // No dates known — default to today + 14 days, today + 21 days
+    var today=new Date();
+    var dep=new Date(today.getFullYear(),today.getMonth(),today.getDate()+14);
+    var ret=new Date(today.getFullYear(),today.getMonth(),today.getDate()+21);
+    function ddmm(d){return String(d.getDate()).padStart(2,"0")+String(d.getMonth()+1).padStart(2,"0");}
+    path="/search/"+origin+ddmm(dep)+dest+ddmm(ret);
+  }
+  var params="marker="+encodeURIComponent(CFG.marker);
+  if(CFG.subid)params+="&sub_id="+encodeURIComponent(CFG.subid+"_"+origin+"_"+dest);
+  return "https://www.aviasales.com"+path+"?"+params;
+}
+
+function bestCCY(country,cashEUR){
+  var keys=DEST_CCY[country]||["USD","EUR"];
+  var native=NATIVE_CCY[country];
+  return keys.map(function(c){
+    var amount=Math.round(cashEUR*FX[c]);
+    var isNative=c===native;
+    var effectiveEUR=isNative?+(cashEUR*0.96).toFixed(2):+cashEUR.toFixed(2);
+    return {ccy:c,sym:SYM[c]||c,amount:amount,effectiveEUR:effectiveEUR,isNative:isNative};
+  }).sort(function(a,b){return a.effectiveEUR-b.effectiveEUR;});
+}
+
+function rubToEur(rub){return Math.round(rub/FX.RUB);}
+// Snapshot prices may be in EUR (new Travelpayouts API) or RUB (legacy). Detect and convert.
+function snapshotPriceToEUR(item){
+  if(item.currency==="EUR")return Math.round(item.value);
+  return Math.round(item.value/FX.RUB);  // legacy RUB
+}
+
+// Determine if Amex FHR likely applies (premium hotels, urban destinations)
+// This is a heuristic: routes that typically lead to FHR-listable cities
+function isAmexFHRCity(country,code){
+  var fhrCities=["Japan","France","UK","Italy","Spain","Germany","Switzerland","UAE","Singapore","Hong_Kong","USA","Australia","Maldives","Thailand"];
+  return fhrCities.indexOf(country)>-1;
+}
+
+// Convert a city/airport pair to approx distance from origin (haversine, km)
+function distKm(originCode,destCode){
+  var a=ACOORDS[originCode],b=ACOORDS[destCode];
+  if(!a||!b)return 5000;
+  var R=6371,toRad=Math.PI/180;
+  var dLat=(b[1]-a[1])*toRad,dLon=(b[0]-a[0])*toRad;
+  var s=Math.sin(dLat/2)*Math.sin(dLat/2)+Math.cos(a[1]*toRad)*Math.cos(b[1]*toRad)*Math.sin(dLon/2)*Math.sin(dLon/2);
+  return Math.round(2*R*Math.asin(Math.sqrt(s)));
+}
+
+
+
+// ============ RECOMMENDATION ENGINE ============
+function recommend(ap,country,cashEUR,ccys,saver,distKmVal){
+  var native=ccys[0];
+  var vpnSave=native&&native.isNative?Math.round(cashEUR*0.04):0;
+  var flightCB=flightCashbackPick();
+  var cbSaving=Math.round(cashEUR*flightCB.rate/100);
+  var cbSavingPeak=Math.round(cashEUR*flightCB.peak/100);
+  var valuationCents={"Singapore Airlines (KrisFlyer)":1.5,"Cathay Pacific (Asia Miles)":1.4,"Qatar Privilege Club":1.3,"Emirates Skywards":1.0,"Flying Blue (AF/KLM)":1.3,"Lufthansa Miles & More":1.4,"British Airways Avios":1.5,"United MileagePlus":1.3,"ANA Mileage Club":1.5,"Qantas Frequent Flyer":1.4};
+  var saverCashEq=null,milesValue=null;
+  if(saver){
+    var vCents=valuationCents[saver.program]||1.3;
+    milesValue=+(cashEUR/(saver.pts/1000)*100/vCents).toFixed(2);
+    saverCashEq=Math.round(saver.pts*vCents/100*0.92);
+  }
+  var city=(ap.city||"").replace(/_/g," ").trim();
+  var fhrEligible=isAmexFHRDest(city)||isAmexFHRDest(country.replace(/_/g," "));
+  var fhrSave=fhrEligible?150:0; // Avg value of FHR perks per stay (breakfast + credit + upgrades)
+
+  // Scores
+  var cashScore=native&&native.isNative?78:68;
+  var vpnScore=vpnSave>=25?80:vpnSave>=15?72:58;
+  var milesScore=0;
+  if(saver&&milesValue){
+    if(milesValue<=75)milesScore=96;
+    else if(milesValue<=90)milesScore=84;
+    else if(milesValue<=110)milesScore=66;
+    else if(milesValue<=140)milesScore=44;
+    else milesScore=22;
+  }
+  var cbScore=flightCB.peak>=6?76:flightCB.peak>=4?62:46;
+  // Amex FHR is a hotel-side play, scored separately and shown as strategic option
+  var amexScore=fhrEligible?(fhrSave>=150?72:58):0;
+
+  var scores=[
+    {key:"cash",score:cashScore,label:"Cash/CCY"},
+    {key:"miles",score:milesScore,label:"Miles"},
+    {key:"cashback",score:cbScore,label:"Cashback"},
+    {key:"vpn",score:vpnScore,label:"VPN+FX"}
+  ].sort(function(a,b){return b.score-a.score;});
+  var w=scores[0];
+  var winClass="w-none",headline="",body="";
+  if(w.key==="miles"&&milesScore>=75&&saver){
+    winClass="w-miles";
+    headline='<span class="vi">Strong saver-redemption opportunity.</span> Miles win <strong>if</strong> saver inventory exists.';
+    body="At the saver rate, <strong>"+saver.pts.toLocaleString()+" "+saver.program+" pts</strong> redeems for this route \u2014 effective cash value ~\u20AC"+saverCashEq+" vs the \u20AC"+cashEUR+" cash fare, a ~\u20AC"+Math.max(0,cashEUR-saverCashEq)+" gap. Critical caveat: saver inventory is the limiting factor. Check availability on Seats.aero or call "+saver.program+" directly before transferring points. If only standard awards show, cash is the better path \u2014 standard-award redemptions destroy point value.";
+  } else if(w.key==="cashback"&&cbScore>=68){
+    winClass="w-cashback";
+    headline='<span class="or">'+flightCB.platform+' cashback wins here.</span> Up to '+flightCB.peak+'% via ShopBack.';
+    body="Activate <strong>"+flightCB.platform+"</strong> via ShopBack at "+flightCB.rate+"% base (save ~\u20AC"+cbSaving+"). Peak boosted hits "+flightCB.peak+"% (~\u20AC"+cbSavingPeak+"). "+flightCB.note;
+  } else if(w.key==="vpn"&&vpnSave>=20){
+    winClass="w-vpn";
+    headline='<span class="cy">Local currency offers FX edge.</span> '+native.ccy+' pricing tends to be cheaper here.';
+    body="Booking in <strong>"+native.ccy+"</strong> ("+native.sym+native.amount+") instead of EUR can save ~\u20AC"+vpnSave+" (~4% flight FX edge typical on this route). Local currency pricing tends to be cheaper than the EUR-converted equivalent; paying via Wise/Revolut eliminates FX margin.";
+  } else {
+    winClass="w-cash";
+    var ccyName=native?native.ccy:"EUR";
+    headline='<span class="gn">Cash booking scores highest.</span> No special strategy beats the direct price.';
+    body=(saver?"Saver award isn't strong value here. ":"")+"Direct airline booking earns status credit; "+flightCB.platform+" via ShopBack adds "+flightCB.rate+"-"+flightCB.peak+"% cashback (~\u20AC"+cbSaving+"-\u20AC"+cbSavingPeak+"). "+(fhrEligible?"For the hotel side, Amex Platinum FHR offers ~\u20AC"+fhrSave+" in benefits at eligible properties.":"");
+  }
+  return {winClass:winClass,headline:headline,body:body,scores:scores,winner:w,vpnSave:vpnSave,saverCashEq:saverCashEq,milesValue:milesValue,flightCB:flightCB,cbSaving:cbSaving,cbSavingPeak:cbSavingPeak,fhrEligible:fhrEligible,fhrSave:fhrSave};
+}
+
+// ============ MAP ============
+var MAP_CDNS=[
+  "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json",
+  "https://unpkg.com/world-atlas@2/countries-110m.json",
+  "https://raw.githubusercontent.com/topojson/world-atlas/master/countries-110m.json"
+];
+function fetchWorldAtlas(idx){
+  idx=idx||0;
+  if(idx>=MAP_CDNS.length)return Promise.reject(new Error("all CDNs failed"));
+  return d3.json(MAP_CDNS[idx]).catch(function(){
+    console.warn("CDN "+(idx+1)+" failed, trying next");
+    return fetchWorldAtlas(idx+1);
+  });
+}
+function initMap(onReady){
+  var wrap=gi("mapwrap");
+  if(!wrap){setLD(false);return;}
+  var W=wrap.clientWidth,H=wrap.clientHeight;
+  if(!W||!H){setTimeout(function(){initMap(onReady);},80);return;}
+  mSVG=d3.select("#msvg").attr("width",W).attr("height",H);
+  mSVG.selectAll("*").remove();
+  mPROJ=d3.geoNaturalEarth1().scale(W/5.8).translate([W/2,H/2]);
+  mPFN=d3.geoPath().projection(mPROJ);
+  var zoom=d3.zoom().scaleExtent([1,8]).on("zoom",function(e){mG.attr("transform",e.transform);});
+  mSVG.call(zoom);
+  mG=mSVG.append("g");
+  mG.append("rect").attr("width",W).attr("height",H).attr("fill","#040c18");
+  mG.append("path").datum(d3.geoGraticule()()).attr("d",mPFN).attr("fill","none").attr("stroke","#091e34").attr("stroke-width",.4);
+  mG.append("g").attr("class","gcountries");
+  mG.append("g").attr("class","gborders");
+  mG.append("g").attr("class","garcs");
+  mG.append("g").attr("class","gpins");
+  if(ST.geoData){renderCountries();drawOriginDot();ST.mapReady=true;if(onReady)onReady();return;}
+  // Map loads silently in background — no overlay
+  var timedOut=false;
+  var timeout=setTimeout(function(){
+    timedOut=true;
+    console.warn("World atlas load timed out \u2014 sidebar-only mode");
+    setSt(ST.dataMode==="snapshot"?"snapshot":"demo","Map unavailable \u2014 sidebar works","");
+    if(onReady)onReady();
+  },3000);
+  fetchWorldAtlas()
+    .then(function(w){
+      if(timedOut)return;
+      clearTimeout(timeout);
+      ST.geoData=w;
+      renderCountries();drawOriginDot();ST.mapReady=true;
+      if(onReady)onReady();
+    })
+    .catch(function(){
+      if(timedOut)return;
+      clearTimeout(timeout);
+      setSt(ST.dataMode==="snapshot"?"snapshot":"demo","Map unavailable \u2014 use sidebar","");
+      if(onReady)onReady();
+    });
+}
+function renderCountries(){
+  var feats=topojson.feature(ST.geoData,ST.geoData.objects.countries).features;
+  mG.select(".gcountries").selectAll(".cp").data(feats).join("path")
+    .attr("class","cp").attr("d",mPFN)
+    .on("click",onCountryClick)
+    .on("mousemove",onHover)
+    .on("mouseleave",function(){gi("tt").classList.remove("on");});
+  mG.select(".gborders").append("path")
+    .datum(topojson.mesh(ST.geoData,ST.geoData.objects.countries,function(a,b){return a!==b;}))
+    .attr("d",mPFN).attr("fill","none").attr("stroke","#112234").attr("stroke-width",.4);
+}
+function drawOriginDot(){
+  var coords=ACOORDS[ST.origin]||ACOORDS["BKK"];
+  var pt=mPROJ(coords);if(!pt)return;
+  var og=mG.append("g").attr("transform","translate("+pt[0]+","+pt[1]+")");
+  og.append("circle").attr("r",10).attr("fill","none").attr("stroke","#00e8a0").attr("stroke-width",1.4).attr("opacity",.4);
+  og.append("circle").attr("r",4).attr("fill","#00e8a0");
+  og.append("text").attr("y",-14).attr("text-anchor","middle").attr("font-family","DM Mono,monospace").attr("font-size","9px").attr("fill","#00e8a0").attr("font-weight","500").text(ST.origin);
+}
+function onCountryClick(event,d){
+  event.stopPropagation();
+  var iso=NUM2ISO[+d.id];if(!iso)return;
+  var cont=ISO2CONT[iso];if(!cont)return;
+  if(ST.level==="world")drillContinent(cont);
+  else if(ST.level==="continent"&&cont===ST.continent){
+    var name=ISO2NAME[iso];if(!name)return;
+    var found=ST.results.find(function(r){return r.country===name||r.iso===iso;});
+    if(found)drillCountry(name,iso);
+  }
+}
+function onHover(event,d){
+  var iso=NUM2ISO[+d.id];if(!iso)return;
+  var name=ISO2NAME[iso]||iso;
+  var cont=ISO2CONT[iso];
+  var tt=gi("tt");
+  var h='<div class="ttn">'+name.replace(/_/g," ")+'</div>';
+  if(cont)h+='<div class="tts">'+cont+'</div>';
+  var r=ST.results.find(function(x){return x.iso===iso||x.country===name;});
+  if(r){
+    var ccys=bestCCY(name,r.cash);
+    if(ST.mode!=="miles")h+='<div class="tts">\u20AC'+r.cash+' \u00B7 '+ccys[0].sym+ccys[0].amount+' '+ccys[0].ccy+'</div>';
+    if(ST.mode==="miles"){var sv=bestSaverForDest(ST.origin,name,distKm(ST.origin,r.code));if(sv)h+='<div class="ttm">'+Math.round(sv.pts/1000)+'K '+sv.program.split(" ")[0]+' saver</div>';}
+    if(ST.mode==="cashback"){var fcb=flightCashbackPick();h+='<div class="ttc">'+fcb.platform+': up to '+fcb.peak+'%</div>';}
+  }
+  tt.innerHTML=h;
+  tt.style.left=(event.clientX+14)+'px';
+  tt.style.top=(event.clientY-38)+'px';
+  tt.classList.add("on");
+}
+
+// ============ DRILL ============
+function drillContinent(cont){
+  ST.level="continent";ST.continent=cont;ST.country=null;ST.countryISO=null;
+  updateBC();
+  var rows=fetchContinent(cont);
+  ST.results=rows;setLD(false);
+  if(ST.mapReady){
+    hiContinent(cont);
+    drawArcs(rows.slice(0,6).map(function(r,i){return {coords:CCOORDS[r.country],i:i};}));
+    drawPins(rows,"country");
+  }
+  sbCountries(cont,rows);hideDP();
+}
+function drillCountry(name,iso){
+  ST.level="country";ST.country=name;ST.countryISO=iso;
+  updateBC();
+  var aps=fetchCountry(name);
+  ST.results=aps;setLD(false);
+  if(ST.mapReady){
+    hiCountry(iso);
+    drawArcs(aps.map(function(a,i){return {coords:ACOORDS[a.code],i:i};}));
+    drawPins(aps,"airport");
+  }
+  sbAirports(name,aps);
+  if(aps.length){
+    showDP(aps[0]);
+    setTimeout(function(){var dp=gi("dp");if(dp&&dp.scrollIntoView)dp.scrollIntoView({behavior:"smooth",block:"start"});},100);
+  }
+}
+function drillWorld(){
+  ST.level="world";ST.continent=null;ST.country=null;ST.countryISO=null;ST.results=[];
+  updateBC();if(ST.mapReady)clearLayers();hideDP();sbWorld();
+}
+
+// ============ DATA FETCH ============
+function snapshotToCountry(item){
+  if(!item.value||!item.destination)return null;
+  var country=IATA_TO_COUNTRY[item.destination];
+  if(!country)return null;
+  var iso=getCountryISO(country);
+  if(!iso)return null;
+  return {country:country,iso:iso,cash:snapshotPriceToEUR(item),city:iataToCity(item.destination),code:item.destination,stops:item.number_of_changes||0,airline:item.gate||"Various",depart_date:item.depart_date,return_date:item.return_date};
+}
+function fetchContinent(cont){
+  if(ST.dataMode==="snapshot"&&ST.snapshotData){
+    var rowsByCountry={};
+    ST.snapshotData.forEach(function(item){
+      if(item.origin&&item.origin!==ST.origin)return;
+      if(ST.monthFilter&&item.depart_date){
+        if(ST.flexDates){
+          // Match selected month OR adjacent months for ±3 day flex
+          var mf=ST.monthFilter,dd=item.depart_date.substring(0,7);
+          var mfd=new Date(mf+"-15"),ddd=new Date(dd+"-15");
+          var monthDiff=Math.abs((ddd.getFullYear()-mfd.getFullYear())*12+(ddd.getMonth()-mfd.getMonth()));
+          if(monthDiff>1)return;
+        } else if(item.depart_date.indexOf(ST.monthFilter)!==0)return;
+      }
+      var n=snapshotToCountry(item);if(!n||ISO2CONT[n.iso]!==cont)return;
+      var ex=rowsByCountry[n.country];if(!ex||n.cash<ex.cash)rowsByCountry[n.country]=n;
+    });
+    var rows=Object.values(rowsByCountry).sort(function(a,b){return a.cash-b.cash;});
+    if(rows.length)return rows;
+  }
+  return (DEMO.countries[cont]||[]).slice().sort(function(a,b){return a.cash-b.cash;});
+}
+function fetchCountry(name){
+  if(ST.dataMode==="snapshot"&&ST.snapshotData){
+    var aps=[];
+    ST.snapshotData.forEach(function(item){
+      if(item.origin&&item.origin!==ST.origin)return;
+      if(ST.monthFilter&&item.depart_date){
+        if(ST.flexDates){
+          // Match selected month OR adjacent months for ±3 day flex
+          var mf=ST.monthFilter,dd=item.depart_date.substring(0,7);
+          var mfd=new Date(mf+"-15"),ddd=new Date(dd+"-15");
+          var monthDiff=Math.abs((ddd.getFullYear()-mfd.getFullYear())*12+(ddd.getMonth()-mfd.getMonth()));
+          if(monthDiff>1)return;
+        } else if(item.depart_date.indexOf(ST.monthFilter)!==0)return;
+      }
+      var n=snapshotToCountry(item);if(!n||n.country!==name)return;
+      aps.push({city:n.city,code:n.code,cash:n.cash,airline:n.airline,stops:n.stops,depart_date:n.depart_date,return_date:n.return_date});
+    });
+    aps.sort(function(a,b){return a.cash-b.cash;});
+    if(aps.length)return aps;
+  }
+  var demoEntry=null;
+  Object.keys(DEMO.countries).forEach(function(c){
+    var f=DEMO.countries[c].find(function(r){return r.country===name;});if(f)demoEntry=f;
+  });
+  if(!demoEntry)return [];
+  return [{city:demoEntry.city,code:demoEntry.code,cash:demoEntry.cash,airline:"Various",stops:0}];
+}
+
+
+
+// ============ MAP RENDERING ============
+function clearLayers(){
+  if(!mG)return;
+  mG.select(".gcountries").selectAll(".cp").attr("class","cp");
+  mG.select(".garcs").selectAll("*").remove();
+  mG.select(".gpins").selectAll("*").remove();
+}
+function hiContinent(cont){
+  clearLayers();if(!mG)return;
+  mG.select(".gcountries").selectAll(".cp").each(function(d){var iso=NUM2ISO[+d.id];if(iso&&ISO2CONT[iso]===cont)d3.select(this).classed("hi",true);});
+}
+function hiCountry(iso){
+  clearLayers();if(!mG)return;
+  mG.select(".gcountries").selectAll(".cp").each(function(d){if(NUM2ISO[+d.id]===iso)d3.select(this).classed("sel",true);});
+}
+function drawArcs(items){
+  if(!mG||!mPROJ)return;
+  var ag=mG.select(".garcs");ag.selectAll("*").remove();
+  var orig=ACOORDS[ST.origin]||ACOORDS["BKK"];
+  items.forEach(function(item){
+    if(!item.coords)return;
+    var interp=d3.geoInterpolate(orig,item.coords);
+    var pts=d3.range(0,1.01,.025).map(function(t){return mPROJ(interp(t));}).filter(Boolean);
+    if(pts.length<2)return;
+    var cls="arc"+(ST.mode==="miles"?" am":ST.mode==="cashback"?" ao":"")+(item.i>0?" dim":"");
+    ag.append("path").attr("class",cls).attr("d","M"+pts.map(function(p){return p.join(",");}).join("L")).attr("stroke-width",item.i===0?1.8:1);
+  });
+}
+function drawPins(rows,type){
+  if(!mG||!mPROJ)return;
+  var pg=mG.select(".gpins");pg.selectAll("*").remove();
+  rows.slice(0,8).forEach(function(r,i){
+    var coords=type==="airport"?ACOORDS[r.code]:CCOORDS[r.country];
+    if(!coords)return;
+    var pt=mPROJ(coords);if(!pt||!pt[0])return;
+    var px=pt[0],py=pt[1],isBest=i===0;
+    var topLine,botLine,fillC,strokeC,textC;
+    var name=r.country||r.city||"";
+    if(ST.mode==="cashback"){
+      var fcb=flightCashbackPick();
+      topLine="up to "+fcb.peak+"%";
+      botLine=fcb.platform;
+      fillC="#1a0800";strokeC="#ff7c3a";textC="#ff7c3a";
+    } else if(ST.mode==="miles"){
+      var sv=bestSaverForDest(ST.origin,name,distKm(ST.origin,r.code));
+      if(sv){topLine=Math.round(sv.pts/1000)+"K";botLine=sv.program.split(" ")[0];}
+      else{topLine="\u20AC"+r.cash;botLine=name.replace(/_/g," ");}
+      fillC="#12082e";strokeC="#b57aff";textC="#b57aff";
+    } else {
+      var bccy=bestCCY(name,r.cash);
+      topLine="\u20AC"+r.cash;
+      botLine=bccy[0]?(bccy[0].sym+bccy[0].amount+" "+bccy[0].ccy):(type==="airport"?r.code:(name.replace(/_/g," ")));
+      fillC=isBest?"#082d20":"#081828";strokeC=isBest?"#00e8a0":"#00d4ff";textC=isBest?"#00e8a0":"#00d4ff";
+    }
+    var bw=Math.max(topLine.length*6.5+14,botLine.length*5.8+14,60);
+    var g=pg.append("g").attr("class","pin").attr("transform","translate("+px+","+(py-32)+")");
+    g.append("rect").attr("x",-bw/2).attr("y",-14).attr("width",bw).attr("height",28).attr("rx",4).attr("fill",fillC).attr("stroke",strokeC).attr("stroke-width",isBest?1.6:1.1);
+    g.append("text").attr("class","plabel").attr("y",-3).attr("font-size","9.5px").attr("fill",textC).attr("font-weight",isBest?"700":"400").text(topLine);
+    g.append("text").attr("class","plabel").attr("y",9).attr("font-size","8px").attr("fill",isBest?textC:"#4a6a8a").text(botLine);
+    pg.append("line").attr("x1",px).attr("y1",py-18).attr("x2",px).attr("y2",py-4).attr("stroke",strokeC).attr("stroke-width",1).attr("opacity",.5);
+    g.on("click",function(){
+      if(type==="country"){var found=ST.results.find(function(x){return x.country===r.country;});if(found&&found.iso)drillCountry(found.country,found.iso);}
+      else showDP(r);
+    });
+  });
+}
+
+// ============ SIDEBAR ============
+function setTxt(id,t){gi(id).textContent=t;}
+function sourceLabel(){
+  if(ST.dataMode==="snapshot"&&ST.snapshotMeta){
+    var d=ST.snapshotMeta.fetched_at?ST.snapshotMeta.fetched_at.slice(0,10):"";
+    return "Snapshot \u00B7 "+d;
+  }
+  return "Demo data";
+}
+function sbWorld(){
+  setTxt("sbEye","CHEAPEST DESTINATIONS");
+  setTxt("sbTit","From "+ST.origin);
+  setTxt("sbMet",sourceLabel());
+  var isMi=ST.mode==="miles",isCb=ST.mode==="cashback";
+  gi("sbl").innerHTML=Object.keys(DEMO.overview).map(function(c){
+    var d=DEMO.overview[c];
+    var bc=bestCCY(d.country,d.cash)[0];
+    var sv=isMi?bestSaverForDest(ST.origin,d.country,distKm(ST.origin,d.code)):null;
+    var fcb=isCb?flightCashbackPick():null;
+    var pp=isMi&&sv?(Math.round(sv.pts/1000)+"K pts"):isCb?("up to "+fcb.peak+"%"):("\u20AC"+d.cash);
+    var ps=isMi&&sv?sv.program:isCb?fcb.platform:(bc.sym+bc.amount+" "+bc.ccy);
+    return '<div class="card cy" onclick="FS.dc(\''+c+'\')">'
+      +'<div class="crow"><div><div class="cname">'+c+'</div><div class="csub">'+d.country.replace(/_/g," ")+' \u00B7 '+d.code+'</div></div>'
+      +'<div class="cprice cy">'+pp+'<small>'+ps+'</small></div></div>'
+      +'<div class="tags"><span class="t def">'+ST.origin+' \u2192 '+d.code+'</span>'
+      +'<span class="t '+(d.stops===0?'gn':'def')+'">'+(d.stops===0?'\u2713 Direct':'1 stop')+'</span>'
+      +(!isMi&&!isCb?'<span class="t cy">best: '+bc.ccy+'</span>':'')
+      +'</div></div>';
+  }).join("");
+}
+function sbCountries(cont,rows){
+  setTxt("sbEye","CHEAPEST TO "+cont.toUpperCase());
+  setTxt("sbTit","From "+ST.origin);
+  setTxt("sbMet",rows.length+" countries \u00B7 "+sourceLabel());
+  var isMi=ST.mode==="miles",isCb=ST.mode==="cashback";
+  gi("sbl").innerHTML=rows.map(function(r,i){
+    var isBest=i===0;
+    var bc=bestCCY(r.country,r.cash)[0];
+    var sv=isMi?bestSaverForDest(ST.origin,r.country,distKm(ST.origin,r.code)):null;
+    var fcb=isCb?flightCashbackPick():null;
+    var pp=isMi&&sv?(Math.round(sv.pts/1000)+"K pts"):isCb?("up to "+fcb.peak+"%"):("\u20AC"+r.cash);
+    var ps=isMi&&sv?sv.program:isCb?fcb.platform:(bc.sym+bc.amount+" "+bc.ccy);
+    var pc=isBest?"gn":isMi?"vi":isCb?"or":"cy";
+    var safeName=r.country.replace(/'/g,"\\'");
+    return '<div class="card '+pc+'" onclick="FS.dco(\''+safeName+'\',\''+(r.iso||"")+'\')">'
+      +(isBest?'<span class="badge gn">CHEAPEST</span>':'')
+      +'<div class="crow"><div><div class="cname">'+r.country.replace(/_/g," ")+'</div><div class="csub">'+(r.city||"").replace(/_/g," ")+' \u00B7 '+r.code+'</div></div>'
+      +'<div class="cprice '+pc+'">'+pp+'<small>'+ps+'</small></div></div>'
+      +'<div class="tags"><span class="t def">'+ST.origin+' \u2192 '+r.code+'</span>'
+      +(!isMi&&!isCb?'<span class="t cy">best: '+bc.ccy+'</span>':'')
+      +(isCb&&fcb?'<span class="t or">'+fcb.platform+'</span>':'')
+      +(isMi&&sv?'<span class="t vi">'+sv.tier+'-haul saver</span>':'')
+      +'</div></div>';
+  }).join("");
+}
+function sbAirports(name,aps){
+  _aps=aps;
+  setTxt("sbEye","AIRPORTS: "+name.replace(/_/g," ").toUpperCase());
+  setTxt("sbTit","From "+ST.origin);
+  setTxt("sbMet",aps.length+" airports \u00B7 "+sourceLabel());
+  if(aps.length===0){
+    gi("sbl").innerHTML='<div style="padding:20px;text-align:center;color:var(--mt);font-family:DM Mono,monospace;font-size:11px">No flights found.<br><br>Try a different origin or refresh the snapshot.</div>';
+    return;
+  }
+  var isMi=ST.mode==="miles",isCb=ST.mode==="cashback";
+  gi("sbl").innerHTML=aps.map(function(a,i){
+    var isBest=i===0;
+    var bc=bestCCY(name,a.cash)[0];
+    var sv=isMi?bestSaverForDest(ST.origin,name,distKm(ST.origin,a.code)):null;
+    var fcb=isCb?flightCashbackPick():null;
+    var pp=isMi&&sv?(Math.round(sv.pts/1000)+"K"):isCb?("up to "+fcb.peak+"%"):("\u20AC"+a.cash);
+    var ps=isMi&&sv?sv.program:isCb?fcb.platform:(bc.sym+bc.amount+" "+bc.ccy);
+    var pc=isBest?"gn":isMi?"vi":isCb?"or":"cy";
+    return '<div class="card '+pc+'" onclick="FS.sdp('+i+')">'
+      +(isBest?'<span class="badge gn">LOWEST PRICE</span>':'')
+      +'<div class="crow"><div><div class="cname">'+(a.city||"").replace(/_/g," ")+' <span style="font-family:DM Mono,monospace;font-size:10px;color:var(--mt2);font-weight:500;letter-spacing:.5px;margin-left:3px">'+a.code+'</span></div>'
+      +'<div class="csub">'+(a.airline||"-")+' \u00B7 '+(a.stops===0?'Direct':a.stops+' stop')+'</div></div>'
+      +'<div class="cprice '+pc+'">'+pp+'<small>'+ps+'</small></div></div>'
+      +'<div class="tags"><span class="t '+(a.stops===0?'gn':'def')+'">'+(a.stops===0?'\u2713 Direct':'via hub')+'</span>'
+      +(!isMi&&!isCb?'<span class="t cy">best: '+bc.ccy+' '+bc.sym+bc.amount+'</span>':'')
+      +(isCb&&fcb?'<span class="t or">'+fcb.platform+' '+fcb.peak+'% peak</span>':'')
+      +(isMi&&sv?'<span class="t vi">saver chart</span>':'')
+      +'</div></div>';
+  }).join("");
+}
+
+// ============ DETAIL PANEL ============
+function showDP(ap){
+  try{
+  var panel=gi("dp");
+  if(!panel){console.error("showDP: #dp element not found");return;}
+  if(!ap||typeof ap!=="object"){
+    console.warn("showDP called with invalid ap:",ap);
+    panel.innerHTML='<div class="rec-body" style="padding:10px">No flight data available for this selection. Try a different airport or origin.</div>';
+    panel.style.display="block";
+    return;
+  }
+  panel.style.display="block";
+  var country=ST.country||ap.city||"";
+  var cashEUR=ap.cash||0;
+  var dist=distKm(ST.origin,ap.code);
+  var saver=bestSaverForDest(ST.origin,country,dist);
+  var ccys=bestCCY(country,cashEUR);
+  var rec=recommend(ap,country,cashEUR,ccys,saver,dist);
+  var dotClr={"w-cash":"var(--gn)","w-miles":"var(--vi)","w-cashback":"var(--or)","w-vpn":"var(--cy)","w-amex":"var(--gd)","w-none":"var(--mt)"}[rec.winClass]||"var(--mt)";
+
+  var ccyRows=ccys.map(function(c,i){
+    return '<tr class="'+(i===0?"best-cur":"")+'"><td>'+(i===0?"\u2B50":c.isNative?"\uD83C\uDFE0":"")+'</td>'
+      +'<td><strong>'+c.ccy+'</strong></td><td>'+c.sym+c.amount.toLocaleString()+'</td>'
+      +'<td style="color:var(--mt);font-size:8.5px">\u2248\u20AC'+c.effectiveEUR.toFixed(0)+'</td>'
+      +'<td style="color:var(--mt);font-size:8px">'+(i===0?"cheapest":c.isNative?"native":"")+'</td></tr>';
+  }).join("");
+
+  // Strategy guidance list
+  var fhrEligible=rec.fhrEligible;
+  var hotelCB=hotelCashbackPick(country);
+  var nightlyRate=getNightlyRate(country,(ap.city||"").replace(/_/g," "));
+  var defaultNights=5;
+  var totalTripCost=cashEUR+(nightlyRate*defaultNights);
+
+  // Find cheapest hotel-adjusted alternative in same continent for comparison
+  var cont=getCountryContinent(country);
+  var betterAlternative=null;
+  if(cont&&ST.snapshotData&&ST.dataMode==="snapshot"){
+    var altCandidates={};
+    ST.snapshotData.forEach(function(item){
+      if(item.origin&&item.origin!==ST.origin)return;
+      var n=snapshotToCountry(item);if(!n||ISO2CONT[n.iso]!==cont||n.country===country)return;
+      var altRate=getNightlyRate(n.country,n.city);
+      var altTotal=n.cash+(altRate*defaultNights);
+      var ex=altCandidates[n.country];
+      if(!ex||altTotal<ex.total){
+        altCandidates[n.country]={country:n.country,cash:n.cash,nightly:altRate,total:altTotal};
+      }
+    });
+    var altList=Object.values(altCandidates).sort(function(a,b){return a.total-b.total;});
+    if(altList.length&&altList[0].total<totalTripCost-50){
+      betterAlternative=altList[0];
+    }
+  } else if(cont){
+    // demo fallback: scan DEMO countries in same continent
+    var altC=(DEMO.countries[cont]||[]).filter(function(r){return r.country!==country;});
+    var altList2=altC.map(function(r){
+      var rate=getNightlyRate(r.country,r.city);
+      return {country:r.country,cash:r.cash,nightly:rate,total:r.cash+(rate*defaultNights)};
+    }).sort(function(a,b){return a.total-b.total;});
+    if(altList2.length&&altList2[0].total<totalTripCost-50)betterAlternative=altList2[0];
+  }
+
+  var strategyItems='<div class="strat-item" data-icon="\u2708"><strong>Direct with airline</strong>Book on the airline website if you hold status or care about flexibility. Status credits and elite-qualifying segments rarely accrue from OTA bookings. Cancellation policies are typically stricter on OTAs even when fares match.</div>'
+    +'<div class="strat-item" data-icon="\uD83C\uDFAB"><strong>'+rec.flightCB.platform+' via ShopBack (cash + cashback)</strong>Activate ShopBack pre-click. Base '+rec.flightCB.rate+'% (~\u20AC'+rec.cbSaving+'), peak '+rec.flightCB.peak+'% (~\u20AC'+rec.cbSavingPeak+'). '+rec.flightCB.note+'</div>'
+    +(saver?'<div class="strat-item" data-icon="\u2728"><strong>Miles redemption \u2014 only at saver rate</strong>The saver-tier chart shows <strong>'+saver.pts.toLocaleString()+' '+saver.program+' pts</strong> for this '+saver.tier+'-haul route. Burn miles <strong>only</strong> if you find saver inventory on your specific dates (Seats.aero or direct airline call). Standard awards cost 2-3x more points and destroy point value \u2014 paying cash is mathematically better in that case. Saver availability changes hourly; verify before committing.</div>':'')
+    +(ccys[0]&&ccys[0].isNative&&rec.vpnSave>10?'<div class="strat-item" data-icon="\uD83C\uDF10"><strong>VPN + native currency (~\u20AC'+rec.vpnSave+' save)</strong>Set VPN to '+country.replace(/_/g," ")+', book in '+ccys[0].ccy+' on local OTA. Pay with Wise/Revolut (no FX). Flight FX edge averages ~4% \u2014 worth it on long-haul, marginal on short. Consider VPN testing for hotels regardless of region \u2014 hotel pricing has bigger geo-arbitrage spread (5\u201320%) than flights.</div>':'<div class="strat-item" data-icon="\uD83C\uDF10"><strong>VPN testing (hotels especially)</strong>Flight FX spread is small here (~4%). For hotels though, geo-arbitrage typically yields 5\u201320% \u2014 comparing prices from different country IP locations reveals these gaps.</div>')
+    +(fhrEligible?'<div class="strat-item" data-icon="\u2B50"><strong>Amex Platinum FHR for the hotel (~\u20AC'+rec.fhrSave+' value)</strong>'+(ap.city||country).replace(/_/g," ")+' has FHR-eligible 4\u20135\u2605 hotels. Benefits: $100 property credit, free breakfast, 4pm late checkout, complimentary room upgrade where available. Real per-stay value ~\u20AC150\u2013200 even if FHR room rate matches OTA. Note: Pay With Points at 1\u00A2/pt is poor value for MR \u2014 use sparingly.</div>':'')
+    +'<div class="strat-item" data-icon="\uD83C\uDFE8"><strong>Hotel via '+hotelCB.platform+' (separate booking)</strong>Best hotel cashback for this region: '+hotelCB.platform+' (base '+hotelCB.rate+'%, peak '+hotelCB.peak+'%). '+hotelCB.note+'</div>';
+
+  
+
+  // Cashback table for context
+  var cbRows=CASHBACK_FLIGHT.map(function(c,i){
+    return '<tr><td>'+(i===0?"\u2605":"")+'</td><td>'+c.platform+'</td><td>'+c.rate+'%</td><td>'+c.peak+'%</td><td>~\u20AC'+Math.round(cashEUR*c.rate/100)+'</td></tr>';
+  }).join("");
+
+  var scoreHTML=rec.scores.map(function(s){
+    var isW=s.score===rec.winner.score;
+    var cls={cash:"s-cash",miles:"s-miles",cashback:"s-cb",vpn:"s-vpn"}[s.key]||"s-cash";
+    return '<div class="rs '+cls+' '+(isW?"active":"dim")+'"><span class="rs-val">'+s.score+'</span><span class="rs-lbl">'+s.label+'</span></div>';
+  }).join("");
+
+  var dateLine=ap.depart_date?'<div class="dr"><span class="dl">DATES</span><span class="dv">'+ap.depart_date+(ap.return_date?" \u2192 "+ap.return_date:"")+'</span></div>':"";
+
+  panel.innerHTML=
+    '<div class="rec-box '+rec.winClass+'">'
+    +'<div class="rec-eyebrow"><div class="rec-dot" style="background:'+dotClr+'"></div>FLIGHTCOMPASS RECOMMENDATION</div>'
+    +'<div class="rec-headline">'+rec.headline+'</div>'
+    +'<div class="rec-body">'+rec.body+'</div>'
+    +'<div style="font-family:DM Mono,monospace;font-size:7.5px;color:var(--mt2);margin-top:10px;letter-spacing:.5px;text-transform:uppercase" title="Each strategy is scored independently out of 100. Scores do not sum \u2014 multiple strategies can apply simultaneously (e.g., book direct + cashback). Higher = better fit for this route.">Strategy fit scores \u00b7 higher = stronger fit \u00b7 independent (not summing to 100)</div><div class="rec-scores">'+scoreHTML+'</div><div style="font-family:DM Mono,monospace;font-size:9px;color:var(--mt);margin-top:11px;line-height:1.85;padding-top:9px;border-top:1px solid var(--bd)"><div style="margin-bottom:3px"><span style="color:var(--gn);font-weight:700">\u2022 Cash/CCY</span> &mdash; book in cheapest currency; native currency gets ~4% FX edge</div><div style="margin-bottom:3px"><span style="color:var(--vi);font-weight:700">\u2022 Miles</span> &mdash; saver award value vs cash; sweet spot \u2265 \u20AC1.40 per 1K points</div><div style="margin-bottom:3px"><span style="color:var(--or);font-weight:700">\u2022 Cashback</span> &mdash; ShopBack flight rate, peak around 6% via Trip.com</div><div><span style="color:var(--cy);font-weight:700">\u2022 VPN+FX</span> &mdash; native currency pricing typically lower than EUR-converted equivalent</div></div></div>'
+
+    +'<div class="dpt"><span class="dpt-icon">\u2708</span>DEAL \u00B7 '+ST.origin+' \u2192 '+(ap.code||"?")+'</div>'
+    +'<div class="dr"><span class="dl">CASH PRICE</span><span class="dv gn">\u20AC'+cashEUR+' RT</span></div>'
+    +'<div class="dr"><span class="dl">AIRLINE</span><span class="dv">'+(ap.airline||"-")+'</span></div>'
+    +'<div class="dr"><span class="dl">ROUTING</span><span class="dv">'+(ap.stops===0?"Direct \u2713":(ap.stops||1)+" stop")+'</span></div>'
+    +'<div class="dr"><span class="dl">DISTANCE</span><span class="dv">'+dist.toLocaleString()+' km</span></div>'
+    +dateLine
+
+    +(betterAlternative?'<hr class="ddiv"><div class="dpt"><span class="dpt-icon">\uD83D\uDCA1</span>TRIP COST CHECK</div><div class="dr"><span class="dl">FLIGHT</span><span class="dv">\u20AC'+cashEUR+'</span></div><div class="dr"><span class="dl">HOTEL \u00B7 '+defaultNights+' NIGHTS</span><span class="dv">\u20AC'+nightlyRate*defaultNights+' ('+nightlyRate+'/night)</span></div><div class="dr"><span class="dl">TOTAL TRIP</span><span class="dv gn">\u20AC'+totalTripCost+'</span></div><div class="disclaim" style="margin-top:6px"><strong style="color:var(--gd)">Cheaper net trip available:</strong> '+betterAlternative.country.replace(/_/g," ")+' at \u20AC'+betterAlternative.cash+' flight + \u20AC'+betterAlternative.nightly+'/night = \u20AC'+betterAlternative.total+' total. Saves ~\u20AC'+(totalTripCost-betterAlternative.total)+' over '+defaultNights+' nights vs '+country.replace(/_/g," ")+'. Cheap flight + expensive hotel often loses to mid flight + cheap hotel.</div>':'<hr class="ddiv"><div class="dpt"><span class="dpt-icon">\uD83D\uDCA1</span>TRIP COST CHECK</div><div class="dr"><span class="dl">FLIGHT</span><span class="dv">\u20AC'+cashEUR+'</span></div><div class="dr"><span class="dl">HOTEL \u00B7 '+defaultNights+' NIGHTS</span><span class="dv">\u20AC'+nightlyRate*defaultNights+' ('+nightlyRate+'/night)</span></div><div class="dr"><span class="dl">TOTAL TRIP</span><span class="dv gn">\u20AC'+totalTripCost+'</span></div><div class="disclaim" style="margin-top:6px">No clearly cheaper trip-cost alternative in '+cont+'. This destination optimises well on flight + accommodation combined.</div>')
+
+    
+    +'<hr class="ddiv"><div class="dpt"><span class="dpt-icon">\uD83D\uDCB1</span>BOOKING CURRENCY</div>'
+    +'<table class="ctable"><tr><th></th><th>CCY</th><th>Price</th><th>EUR</th><th></th></tr>'+ccyRows+'</table>'
+    +(ccys[0]&&ccys[0].isNative&&rec.vpnSave>10?'<div style="font-family:DM Mono,monospace;font-size:8.5px;color:var(--cy);margin-top:4px;line-height:1.6">VPN to '+country.replace(/_/g," ")+', book in '+ccys[0].ccy+'. Save ~\u20AC'+rec.vpnSave+' (~4% flight FX edge).</div>':"")
+
+    +(saver?'<hr class="ddiv"><div class="dpt"><span class="dpt-icon">\u2728</span>MILES \u00B7 SAVER AWARD CHART</div>'
+      +'<div class="dr"><span class="dl">PROGRAM</span><span class="dv vi">'+saver.program+'</span></div>'
+      +'<div class="dr"><span class="dl">SAVER COST</span><span class="dv vi">'+saver.pts.toLocaleString()+' pts</span></div>'
+      +'<div class="dr"><span class="dl">DISTANCE TIER</span><span class="dv">'+saver.tier+'-haul</span></div>'
+      +'<div class="dr"><span class="dl">VALUATION CASH</span><span class="dv">\u2248\u20AC'+rec.saverCashEq+'</span></div>'
+      +'<div class="disclaim">Award space changes hourly and must be verified on the airline site or via Seats.aero / AwardLogic. Chart rate is what saver awards cost <strong>when available</strong> \u2014 not a guarantee of availability.</div>'
+      :"")
+
+    +'<hr class="ddiv"><div class="dpt"><span class="dpt-icon">\uD83C\uDFAB</span>FLIGHT CASHBACK (SHOPBACK)</div>'
+    +'<table class="ctable"><tr><th></th><th>Platform</th><th>Base</th><th>Peak</th><th>Save</th></tr>'+cbRows+'</table>'
+    +'<div class="disclaim">Rates are historical highs as of build date \u2014 verify live rate on ShopBack before clicking through. Not all flights track on all platforms (LCCs, codeshares often excluded).</div>'
+
+    +'<div class="strategy-list"><div class="dpt"><span class="dpt-icon">\uD83E\uDDED</span>BOOKING STRATEGY</div>'+strategyItems+'</div>'
+
+    +(function(){
+      var url=buildAviasalesURL(ST.origin,ap.code,ap.depart_date,ap.return_date);
+      if(!url)return "";
+      return '<div style="margin-top:12px;padding:11px 13px;background:rgba(0,212,255,.04);border:1px solid var(--bd);border-radius:7px;text-align:center">'
+        +'<a href="'+url+'" target="_blank" rel="noopener nofollow sponsored" style="display:inline-block;background:var(--cy);color:var(--bg);font-weight:800;font-size:13px;padding:9px 18px;border-radius:5px;text-decoration:none;letter-spacing:.3px">Open in Aviasales \u2192</a>'
+        +'<div style="font-family:DM Mono,monospace;font-size:8px;color:var(--mt);margin-top:7px;line-height:1.5">Pre-fills '+ST.origin+' \u2192 '+(ap.code||"")+(ap.depart_date?" \u00B7 "+ap.depart_date:"")+'. Opens Aviasales search; affiliate link \u2014 see footer.</div>'
+        +'</div>';
+    })()
+    +'<div class="disclaim" style="margin-top:10px">Snapshot price is up to 7 days old (Aviasales cache). Always verify on the airline\u2019s direct site before booking. Currency conversion, taxes, and seat selection fees may differ between channels.</div>';
+
+  } catch(e){
+    console.error("showDP render error:",e.message,e.stack);
+    var p=gi("dp");if(p){p.innerHTML='<div class="rec-body" style="padding:10px;color:var(--or)">Could not render recommendation: '+e.message+'</div>';p.style.display="block";}
+  }
+}
+function hideDP(){gi("dp").style.display="none";}
+
+function updateBC(){
+  var h='<span class="bc-link" data-lv="world">World</span>';
+  if(ST.continent){
+    h+='<span class="bc-sep">/</span>';
+    if(ST.country){h+='<span class="bc-link" data-lv="continent">'+ST.continent+'</span><span class="bc-sep">/</span><span class="bc-cur">'+ST.country.replace(/_/g," ")+'</span>';}
+    else{h+='<span class="bc-cur">'+ST.continent+'</span>';}
+  }
+  var bc=gi("bc");bc.innerHTML=h;
+  bc.querySelectorAll(".bc-link").forEach(function(el){
+    el.addEventListener("click",function(){if(el.dataset.lv==="world")drillWorld();else if(el.dataset.lv==="continent")drillContinent(ST.continent);});
+  });
+}
+function setSt(type,msg,src){gi("sDot").className="sdot "+type;gi("sStatus").textContent=msg;if(src!==undefined)gi("sSource").textContent=src;}
+function setLD(on,msg){var m=gi("ldmsg"),o=gi("ldover");if(m)m.textContent=msg||"";if(o)o.classList.toggle("on",!!on);if(on){var d=gi("sDot");if(d)d.className="sdot busy";}}
+function setMode(m){
+  ST.mode=m;
+  ["Cash","Miles","Both","Cashback"].forEach(function(n){gi("p"+n).className="pill"+(m===n.toLowerCase()?" on-"+m:"");});
+  if(ST.level==="world")sbWorld();
+  else if(ST.level==="continent"){sbCountries(ST.continent,ST.results);if(ST.mapReady&&ST.results.length)drawPins(ST.results,"country");}
+  else if(ST.level==="country"){sbAirports(ST.country,ST.results);if(ST.mapReady&&ST.results.length)drawPins(ST.results,"airport");}
+}
+window.FS={
+  dc:drillContinent,
+  dco:function(name,iso){if(!iso){iso=getCountryISO(name);}drillCountry(name,iso);},
+  sdp:function(i){
+    showDP(_aps[i]);
+    // Auto-scroll detail panel into view (especially helpful on mobile)
+    setTimeout(function(){
+      var dp=gi("dp");
+      if(dp&&dp.scrollIntoView){
+        dp.scrollIntoView({behavior:"smooth",block:"start"});
+      }
+    },80);
+  }
+};
+
+// ============ BOOT ============
+function startApp(){
+  // Affiliate disclosure: only shown when marker is configured
+  var disc=gi("affDisclosure");
+  if(disc){
+    if(CFG.marker){
+      disc.innerHTML='\u00B7 Contains affiliate links (Aviasales)';
+    } else {
+      disc.innerHTML='';
+    }
+  }
+  // Wire date picker + flex toggle with hard JS clamping (iOS Safari ignores min/max sometimes)
+  var ms=gi("hMonth"),fx=gi("hFlexChk");
+  if(ms&&!ms._wired){
+    ms._wired=true;
+    var now=new Date();
+    var today=now.getFullYear()+"-"+String(now.getMonth()+1).padStart(2,"0")+"-"+String(now.getDate()).padStart(2,"0");
+    var maxDate=new Date(now.getFullYear(),now.getMonth()+12,now.getDate());
+    var maxStr=maxDate.getFullYear()+"-"+String(maxDate.getMonth()+1).padStart(2,"0")+"-"+String(maxDate.getDate()).padStart(2,"0");
+    ms.min=today;ms.max=maxStr;
+    function clampDate(){
+      if(!ms.value)return;
+      if(ms.value<today){ms.value=today;}
+      else if(ms.value>maxStr){ms.value=maxStr;}
+    }
+    function applyFilter(){
+      clampDate();
+      // Convert YYYY-MM-DD to YYYY-MM for monthFilter compatibility with depart_date matching
+      ST.monthFilter=ms.value?ms.value.substring(0,7):"";
+      ST.exactDate=ms.value||"";
+      ST.flexDates=fx&&fx.checked;
+      if(ST.level==="world")sbWorld();
+      else if(ST.level==="continent")drillContinent(ST.continent);
+      else if(ST.level==="country")drillCountry(ST.country,ST.countryISO);
+    }
+    ms.addEventListener("change",applyFilter);
+    ms.addEventListener("input",clampDate);
+    ms.addEventListener("blur",clampDate);
+    if(fx)fx.addEventListener("change",applyFilter);
+  }
+  updateBC();sbWorld();
+  initMap(function(){
+    if(ST.level==="continent"&&ST.continent)drillContinent(ST.continent);
+    else if(ST.level==="country"&&ST.country)drillCountry(ST.country,ST.countryISO);
+  });
+}
+function tryLoadSnapshot(){
+  setSt("busy","Loading snapshot...","");
+  // Belt-and-suspenders: also force-update the visible label after 8s
+  // in case the browser holds the fetch open without resolving
+  setTimeout(function(){
+    if(ST.dataMode!=="snapshot"){
+      setSt("demo","Demo data (snapshot unavailable)","");
+    }
+  },8000);
+  // Race fetch against a 6s timeout so we never hang the boot
+  var fetchProm=fetch("flight-data.json",{cache:"no-cache"}).then(function(r){
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    return r.json();
+  });
+  var timeoutProm=new Promise(function(_,reject){
+    setTimeout(function(){reject(new Error("timeout"));},6000);
+  });
+  return Promise.race([fetchProm,timeoutProm]).then(function(d){
+    if(!d||!d.routes||!Array.isArray(d.routes))throw new Error("invalid format");
+    ST.snapshotData=d.routes;ST.snapshotMeta=d.meta||{};
+    ST.dataMode="snapshot";
+    var date=d.meta&&d.meta.fetched_at?d.meta.fetched_at.slice(0,10):"unknown";
+    setSt("snapshot",d.routes.length+" routes","Snapshot \u00B7 "+date);
+    return true;
+  }).catch(function(e){
+    console.info("Snapshot unavailable, using demo:",e.message);
+    ST.dataMode="demo";
+    setSt("demo","Offline mode \u2014 demo data","Upload flight-data.json or run the GitHub Action");
+    return false;
+  });
+}
+
+gi("mDemo").addEventListener("click",function(){gi("modal").classList.add("off");ST.dataMode="demo";setSt("demo","Demo mode","Curated price levels");startApp();});
+var aboutLink=gi("aboutLink"),aboutModal=gi("aboutModal"),aboutClose=gi("aboutClose");
+if(aboutLink&&aboutModal){
+  aboutLink.addEventListener("click",function(e){e.preventDefault();aboutModal.classList.remove("off");});
+}
+if(aboutClose&&aboutModal){
+  aboutClose.addEventListener("click",function(){aboutModal.classList.add("off");});
+}
+if(aboutModal){
+  aboutModal.addEventListener("click",function(e){if(e.target===aboutModal)aboutModal.classList.add("off");});
+}
+gi("mRetry").addEventListener("click",function(){gi("modal").classList.add("off");tryLoadSnapshot().then(startApp);});
+gi("hSearch").addEventListener("click",function(){
+  var raw=gi("hOrigin").value;
+  var r=resolveOriginInput(raw);
+  ST.origin=r.iata;
+  ST.originSubstituted=r.substituted;
+  ST.originalInput=r.originalInput;
+  gi("hOrigin").value=r.iata;
+  // Update banner state
+  updateOriginBanner();
+  if(ST.level==="world")sbWorld();
+  else drillWorld();
+});
+
+function updateOriginBanner(){
+  var b=gi("originBanner");
+  if(!b)return;
+  if(ST.originSubstituted&&ST.originalInput){
+    b.innerHTML='<span style="color:var(--gd)">Live data unavailable for <strong>'+ST.originalInput+'</strong>. Showing <strong>'+ST.origin+'</strong> as nearest major hub. Actual prices from '+ST.originalInput+' typically differ by \u20AC30-80 from '+ST.origin+'.</span>';
+    b.style.display="block";
+  } else {
+    b.style.display="none";
+  }
+}
+var _rsz;
+window.addEventListener("resize",function(){
+  clearTimeout(_rsz);
+  _rsz=setTimeout(function(){
+    if(!ST.geoData)return;
+    var lvl=ST.level,cont=ST.continent,cty=ST.country,iso=ST.countryISO;
+    ST.mapReady=false;
+    initMap(function(){
+      if(lvl==="continent"&&cont)drillContinent(cont);
+      else if(lvl==="country"&&cty)drillCountry(cty,iso);
+      else{updateBC();sbWorld();}
+    });
+  },250);
+});
+
+// Boot: try snapshot, fall through to demo if missing
+tryLoadSnapshot().then(function(){startApp();});
+})();
+</script>
+
+<!-- ANALYTICS: GoatCounter (free, no cookies, no GDPR banner needed)
+     1. Sign up at https://www.goatcounter.com (free, ~30 seconds)
+     2. Choose a site code, e.g. "felix-flightcompass"
+     3. Replace YOUR_GOATCOUNTER_CODE below with your code
+     4. Uncomment the two lines below
+-->
+<!--
+<script data-goatcounter="https://YOUR_GOATCOUNTER_CODE.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
+-->
+</body>
+</html>
