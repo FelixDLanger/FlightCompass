@@ -1,0 +1,51 @@
+name: Refresh flight data
+
+# Runs weekly Tuesday 06:00 UTC (airlines typically push weekly fare sales then).
+# Also runnable manually from the Actions tab.
+on:
+  schedule:
+    - cron: '0 6 * * 2'
+  workflow_dispatch:
+    inputs:
+      month:
+        description: 'Departure month filter (YYYY-MM, optional)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Fetch Travelpayouts snapshot
+        env:
+          TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
+        run: |
+          if [ -n "${{ github.event.inputs.month }}" ]; then
+            python3 fetch_snapshot.py --month "${{ github.event.inputs.month }}"
+          else
+            python3 fetch_snapshot.py
+          fi
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain flight-data.json)" ]; then
+            git add flight-data.json
+            git commit -m "Refresh flight-data.json [skip ci]"
+            git push
+            echo "Snapshot refreshed and committed."
+          else
+            echo "No changes to snapshot."
+          fi
