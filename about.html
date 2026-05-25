@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>About FlightCompass — Methodology, Data Sources, and Editorial Approach</title>
+<meta name="description" content="How FlightCompass works: methodology behind the recommendation engine that scores cash, miles, cashback, and currency-based booking strategies across global routes. Built as DBA research at GlobalNxt University.">
+<meta name="author" content="Felix Diego Langer">
+<meta name="keywords" content="flight strategy methodology, award chart redemption, miles redemption value, ShopBack cashback, Amex FHR, multi-currency booking, geo-pricing, travel research tool">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#04080f">
+<meta property="og:title" content="About FlightCompass — Methodology and Approach">
+<meta property="og:description" content="How the recommendation engine works: independent scoring of cash, miles, cashback, and currency strategies across 100+ destinations.">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://felixdlanger.github.io/FlightCompass/about.html">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="About FlightCompass — Methodology">
+<meta name="twitter:description" content="Independent strategy scoring for global flight routes — a doctoral research tool.">
+<link rel="canonical" href="https://felixdlanger.github.io/FlightCompass/about.html">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "AboutPage",
+  "name": "About FlightCompass",
+  "description": "Methodology and editorial approach behind FlightCompass, a doctoral research-oriented flight strategy explorer.",
+  "url": "https://felixdlanger.github.io/FlightCompass/about.html",
+  "mainEntity": {
+    "@type": "WebApplication",
+    "name": "FlightCompass",
+    "url": "https://felixdlanger.github.io/FlightCompass/",
+    "applicationCategory": "TravelApplication",
+    "author": {
+      "@type": "Person",
+      "name": "Felix Diego Langer",
+      "sameAs": "https://www.linkedin.com/in/felix-langer-2a8425168/"
+    }
+  }
+}
+</script>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2304080f'/%3E%3Ccircle cx='50' cy='50' r='28' fill='none' stroke='%2300d4ff' stroke-width='3'/%3E%3Cpath d='M50 22 L54 50 L78 54 L54 50 L50 78 L46 50 L22 46 L46 50 Z' fill='%2300e8a0'/%3E%3Ccircle cx='50' cy='50' r='3' fill='%23b57aff'/%3E%3C/svg%3E">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Cabinet+Grotesk:wght@400;700;800;900&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#04080f;--s1:#0a1220;--s2:#0f1a2e;--bd:#1c304d;--bd2:#243d5e;--cy:#00d4ff;--gn:#00e8a0;--vi:#b57aff;--or:#ff7c3a;--gd:#ffc857;--tx:#d8e8f8;--mt:#7a92ad;--mt2:#4a6a8a}
+html,body{background:var(--bg);color:var(--tx);font-family:'Cabinet Grotesk',system-ui,sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased}
+body{max-width:780px;margin:0 auto;padding:32px 24px 80px}
+header.page-header{display:flex;align-items:center;gap:12px;padding-bottom:20px;border-bottom:1px solid var(--bd);margin-bottom:32px}
+.logo-orb{width:22px;height:22px;border-radius:50%;background:conic-gradient(from 0deg,#00d4ff,#b57aff 40%,#00e8a0 80%,#00d4ff);flex-shrink:0}
+.logo{font-size:18px;font-weight:900;letter-spacing:-.4px;color:var(--cy);text-decoration:none}
+nav{margin-left:auto;display:flex;gap:16px;font-size:13px}
+nav a{color:var(--mt);text-decoration:none;transition:color .15s}
+nav a:hover{color:var(--cy)}
+h1{font-size:32px;font-weight:900;letter-spacing:-.8px;margin-bottom:8px;color:var(--tx)}
+.tagline{color:var(--mt);font-size:14px;margin-bottom:32px;font-family:'DM Mono',monospace}
+h2{font-size:20px;font-weight:800;margin-top:36px;margin-bottom:12px;color:var(--cy);letter-spacing:-.3px}
+h3{font-size:15px;font-weight:700;margin-top:20px;margin-bottom:8px;color:var(--tx)}
+p{margin-bottom:14px;font-size:15px;color:var(--tx)}
+ul{margin-bottom:16px;padding-left:22px}
+li{margin-bottom:6px;font-size:15px}
+strong{color:var(--tx);font-weight:700}
+a{color:var(--cy);text-decoration:none;border-bottom:1px solid rgba(0,212,255,.3);transition:border-color .15s}
+a:hover{border-color:var(--cy)}
+code{background:var(--s1);padding:2px 6px;border-radius:3px;font-family:'DM Mono',monospace;font-size:13px;color:var(--gn)}
+.callout{background:var(--s1);border-left:3px solid var(--cy);padding:14px 18px;margin:18px 0;border-radius:4px;font-size:14px}
+.callout strong{color:var(--cy)}
+footer{margin-top:60px;padding-top:24px;border-top:1px solid var(--bd);font-family:'DM Mono',monospace;font-size:11px;color:var(--mt);line-height:1.7}
+footer a{color:var(--cy);border-bottom:none}
+.disc{font-size:11px;color:var(--mt2);margin-top:18px;line-height:1.6}
+</style>
+</head>
+<body>
+
+<header class="page-header">
+  <div class="logo-orb"></div>
+  <a href="index.html" class="logo">FlightCompass</a>
+  <nav>
+    <a href="index.html">Tool</a>
+    <a href="https://www.linkedin.com/in/felix-langer-2a8425168/" rel="noopener" target="_blank">LinkedIn</a>
+  </nav>
+</header>
+
+<h1>About FlightCompass</h1>
+<p class="tagline">A research-oriented flight strategy explorer — not a booking tool.</p>
+
+<p>FlightCompass is an interactive decision-support tool that compares booking strategies for any flight route across a snapshot of cached fares from 60+ global hubs and 100+ destinations. The recommendation engine scores four strategies independently — cash, miles redemption, cashback platforms, and currency-based pricing — and surfaces the strongest fit for each route without forcing artificial trade-offs between them.</p>
+
+<p>The tool was built by <a href="https://www.linkedin.com/in/felix-langer-2a8425168/" rel="noopener" target="_blank">Felix Diego Langer</a> as part of doctoral research in business administration (DBA) at GlobalNxt University, exploring decision frameworks applicable to enterprise pricing architecture in APAC and globally.</p>
+
+<h2>How it works</h2>
+
+<h3>Data sources</h3>
+<p>Flight prices are sourced from the Travelpayouts/Aviasales Data API — the same cache that powers the Aviasales metasearch interface. The snapshot is refreshed weekly via a scheduled GitHub Action that fetches both round-trip and one-way prices for 6,000+ origin-destination pairs and commits the result as a JSON file alongside the application. This means the tool is fast (no live API calls block the browser), the data is consistent across sessions (everyone sees the same snapshot), and the architecture is transparent (the fetcher script is published in the repository).</p>
+
+<p>Award charts, cashback rates, and hotel benchmarks are hand-curated reference data. Specifically:</p>
+<ul>
+  <li><strong>Award charts</strong>: distance-tier saver-rate redemption values for KrisFlyer, Asia Miles, Qatar Privilege Club, Emirates Skywards, Flying Blue, Lufthansa Miles &amp; More, British Airways Avios, United MileagePlus, ANA Mileage Club, and Qantas Frequent Flyer</li>
+  <li><strong>Cashback rates</strong>: historical peak rates for ShopBack flight and hotel platforms — Trip.com, Klook, Kiwi, Booking.com, Agoda, Hotels.com</li>
+  <li><strong>Hotel benchmarks</strong>: median 4-star nightly rates for approximately 100 major cities, used in the trip-cost optimizer</li>
+  <li><strong>Amex FHR eligibility</strong>: list of major luxury markets typically appearing in the Fine Hotels &amp; Resorts catalog</li>
+</ul>
+
+<h3>Scoring methodology</h3>
+<p>Each strategy receives an independent score from 0 to 100. Scores deliberately do <strong>not</strong> sum to 100, because multiple strategies can apply simultaneously — booking direct with an airline while stacking ShopBack cashback, for instance, is the same booking event with two independent dimensions of value. Forcing them to share a fixed-sum allocation would create false trade-offs that don't exist in reality.</p>
+
+<ul>
+  <li><strong>Cash / CCY</strong> — scores the FX margin from booking in the destination's native currency versus the EUR-converted equivalent. Native-currency flight prices are typically about 4% cheaper on routes where the destination currency is also the airline's pricing currency.</li>
+  <li><strong>Miles</strong> — scores the saver-rate award redemption value versus the cash equivalent. Sweet-spot threshold: approximately €1.40 per 1,000 points. Standard-tier award redemptions score low because they typically destroy point value.</li>
+  <li><strong>Cashback</strong> — scores the peak ShopBack rate available for the route via partner platforms. Trip.com peaks around 6% during boosted periods.</li>
+  <li><strong>Hotel geo</strong> — scores the probability that regional hotel pricing differences are large enough to be worth comparing. Hotel OTAs may display different rates for the same property depending on detected user region, with observed spreads typically running 5 to 20 percent in mature SEA, LATAM, and South Asia markets.</li>
+</ul>
+
+<h3>Editorial approach</h3>
+<p>The recommendation engine surfaces the strategy that scores highest for a given route — with full transparency about scores, methodology, and trade-offs. When direct airline booking is the strongest option (for status credit, flexibility, and clean cancellation), the engine surfaces that. When a saver-rate award redemption beats the cash fare, the engine surfaces that. When OTA cashback provides the best net value, the engine surfaces that. No affiliate-linked option is highlighted simply because it generates revenue.</p>
+
+<div class="callout">
+<strong>On affiliate links:</strong> the tool optionally includes a Travelpayouts affiliate marker that activates a "Search this route on Aviasales" button in the detail panel. This is opt-in via a single configuration variable and respects the editorial principle: the affiliate path is one option among many, not the highlighted recommendation. When affiliate links are active, a footer disclosure appears, and outbound links carry the appropriate <code>rel="sponsored"</code> semantics for FTC compliance.
+</div>
+
+<h2>What FlightCompass is not</h2>
+<ul>
+  <li><strong>Not a booking platform.</strong> The tool surfaces strategy options; users book through the airline, OTA, or partner of their choice.</li>
+  <li><strong>Not financial advice.</strong> Booking decisions involve personal context (status standing, payment method, miles balances, travel insurance, tax treatment) that this tool cannot evaluate.</li>
+  <li><strong>Not real-time.</strong> The snapshot has a 2-to-7-day cache lag from Aviasales. Prices shown reflect what was available recently; live availability must always be verified on the actual booking site before transacting.</li>
+  <li><strong>Not affiliated</strong> with Aviasales, ShopBack, Amex, or any other booking platform referenced in the tool. References to these brands are made in their nominative sense (describing what each platform does) and do not imply partnership, endorsement, or sponsorship.</li>
+</ul>
+
+<h2>Data and privacy</h2>
+<p>FlightCompass does not set cookies, does not track visitors, and does not collect personal data. The page loads a static snapshot file and the world atlas from public CDNs. When users click affiliate links to external services, those services apply their own privacy policies, which are outside the scope of FlightCompass.</p>
+
+<h2>Why this exists</h2>
+<p>The dual purpose is academic and personal. As a working prototype of a multi-dimensional decision framework, FlightCompass complements ongoing doctoral research on enterprise pricing architecture and concentric-valuation models. As a practical utility, the author uses it personally for travel planning across Bangkok, Singapore, and European hubs — and the tool's architecture is shaped by that real-world use rather than by hypothetical user testing.</p>
+
+<p>The intent is to demonstrate that decision tools can be honest first and monetization-aware second, with transparent methodology and observable scoring formulas that any user can audit. Most flight comparison tools optimize for click-through rates to OTA partners. FlightCompass optimizes for informed decisions, even when those decisions route users away from affiliate revenue.</p>
+
+<h2>Contact</h2>
+<p>For questions, corrections, research collaboration, or methodology discussions, the most reliable channel is direct message via <a href="https://www.linkedin.com/in/felix-langer-2a8425168/" rel="noopener" target="_blank">LinkedIn</a>.</p>
+
+<footer>
+  <p>FLIGHTCOMPASS · © 2026 Felix Diego Langer · <a href="index.html">Open the tool →</a></p>
+  <p class="disc">Research tool — not financial advice. Snapshot prices are up to 7 days old (Aviasales cache). Award space, cashback rates, and hotel benefits must be verified live before booking. Currency conversion, taxes, and fees may vary between channels. Data: Aviasales (cached) · hand-curated award charts and reference rates.</p>
+</footer>
+
+</body>
+</html>
