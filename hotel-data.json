@@ -1,0 +1,13 @@
+{
+  "meta": {
+    "fetched_at": "2026-05-25T11:48:00.770642+00:00",
+    "source": "Hotellook cache.json",
+    "check_in": "2026-06-24",
+    "check_out": "2026-06-27",
+    "nights": 3,
+    "currency": "EUR",
+    "city_count": 0,
+    "note": "Median prices exclude top 10% (luxury skew). Sample sizes vary by city."
+  },
+  "cities": {}
+}
