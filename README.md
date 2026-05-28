@@ -72,9 +72,6 @@ Required GitHub repo secret: `TRAVELPAYOUTS_TOKEN` (free signup at travelpayouts
 
 The tool supports optional Travelpayouts affiliate integration. To activate, edit `index.html` and paste your Travelpayouts marker ID into the `CFG.marker` variable near the top of the script. While inactive, no affiliate links or disclosures render. While active, an “Open in Aviasales →” button appears in detail panels with a footer disclosure and FTC-style `rel="sponsored"` link semantics. Affiliate-monetized booking paths surface only when the corresponding strategy is the route’s best-scoring option — editorial integrity takes precedence over monetization.
 
-## License
-
-MIT — see <LICENSE>.
 
 -----
 
