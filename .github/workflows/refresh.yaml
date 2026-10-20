@@ -1,0 +1,76 @@
+name: Refresh flight data
+
+# Weekly snapshot of cached Aviasales fares via the Travelpayouts Data API.
+# Tuesday 06:00 UTC catches airlines' weekly sale cycle. Can also be run by hand
+# (Actions tab -> Refresh flight data -> Run workflow), optionally for one month.
+on:
+  schedule:
+    - cron: "0 6 * * 2"
+  workflow_dispatch:
+    inputs:
+      month:
+        description: "Optional departure month, YYYY-MM (leave empty for all dates)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+# Never let two refreshes push at the same time
+concurrency:
+  group: refresh-flight-data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Fetch Travelpayouts snapshot
+        env:
+          TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
+          # Passed through the environment, not pasted into the script, so the input can't inject shell code
+          MONTH: ${{ github.event.inputs.month }}
+        run: |
+          if [ ! -f "fetch_snapshot.py" ]; then
+            echo "::error::fetch_snapshot.py not found in repo root."
+            ls -la
+            exit 1
+          fi
+          if [ -z "$TRAVELPAYOUTS_TOKEN" ]; then
+            echo "::error::TRAVELPAYOUTS_TOKEN secret is not set."
+            echo "Add it: Settings -> Secrets and variables -> Actions -> New repository secret"
+            exit 1
+          fi
+          if [ -n "$MONTH" ]; then
+            if ! echo "$MONTH" | grep -Eq '^[0-9]{4}-[0-9]{2}$'; then
+              echo "::error::month must look like 2026-11"
+              exit 1
+            fi
+            python3 fetch_snapshot.py --month "$MONTH"
+          else
+            python3 fetch_snapshot.py
+          fi
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Stage only the flight snapshot. (The old step also staged hotel-data.json; when that file
+          # is absent, "git add" aborts and the weekly commit silently fails.)
+          git add flight-data.json
+          if git diff --cached --quiet; then
+            echo "No changes to snapshot."
+          else
+            git commit -m "Refresh flight-data.json [skip ci]"
+            git push
+            echo "Snapshot refreshed and committed."
+          fi
