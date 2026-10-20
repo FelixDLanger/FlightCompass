@@ -5,5 +5,5 @@
 // marker: your numeric Travelpayouts partner ID (Travelpayouts dashboard -> Profile / Tools).
 //         Leave it "" to run without affiliate links; the footer disclosure then stays hidden.
 window.FC_CONFIG = {
-  marker: ""
+  marker: 7ea001e19d0b23f45c58aeaad1d12fa2
 };
