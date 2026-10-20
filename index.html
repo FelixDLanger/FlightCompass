@@ -257,6 +257,17 @@ label.h-stacked{padding:0 14px}
 .strat-item strong{color:var(--tx);font-weight:700}
 .strat-item>strong:first-child{display:block;margin-bottom:2px;font-family:'Cabinet Grotesk',sans-serif;font-size:10.5px}
 .disclaim{font-family:'DM Mono',monospace;font-size:8px;color:var(--mt2);line-height:1.6;margin-top:8px;padding:6px 8px;background:rgba(255,200,87,.04);border:1px solid rgba(255,200,87,.12);border-radius:4px}
+.hpc-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 9px;margin-bottom:9px}
+.hpc-f{display:flex;flex-direction:column;gap:4px;font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.8px;text-transform:uppercase;color:var(--mt)}
+.hpc-f input[type=number]{background:var(--s2);border:1px solid var(--bd);color:var(--tx);border-radius:5px;padding:6px 8px;font-family:'DM Mono',monospace;font-size:12px;outline:none;width:100%;box-sizing:border-box;-moz-appearance:textfield;appearance:textfield}
+.hpc-f input[type=number]:focus{border-color:var(--cy)}
+.hpc-f input::-webkit-outer-spin-button,.hpc-f input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.hpc-chk{flex-direction:row;align-items:center;gap:7px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:10px;color:var(--tx);align-self:end;min-height:31px}
+.hpc-chk input{width:15px;height:15px;accent-color:var(--gd);margin:0;flex-shrink:0}
+.hpc-hint{font-family:'DM Mono',monospace;font-size:8.5px;color:var(--gd);margin:-3px 0 8px}
+.hpc-act{font-family:'Cabinet Grotesk',sans-serif;font-weight:800;font-size:15px;line-height:1.25;margin:2px 0 7px}
+.hpc-note{font-family:'DM Mono',monospace;font-size:9px;color:var(--mt);line-height:1.6;margin-top:5px}
+@media (hover:none) and (pointer:coarse){.hpc-f input[type=number]{font-size:16px}}
 .modal-bg{position:fixed;inset:0;background:rgba(4,8,15,.92);display:flex;align-items:center;justify-content:center;z-index:200}
 .modal-bg.off{display:none}
 .modal{background:var(--s1);border:1px solid var(--bd);border-radius:11px;padding:28px;width:520px;max-width:94vw}
@@ -467,6 +478,9 @@ var CFG={
   subid:"flightcompass"  // SubID prefix; Travelpayouts reads it as marker=<ID>.<SubID>
 };
 // Travelpayouts partner IDs are numeric; anything else (a pasted URL, "marker=...") is ignored.
+if(/^[0-9a-f]{32}$/i.test(CFG.marker)){
+  console.error("FlightCompass: config.js holds what looks like your Travelpayouts API token. Remove it, update the token in Travelpayouts, and keep it only in GitHub Actions secrets.");
+}
 if(CFG.marker&&!/^\d{3,12}$/.test(CFG.marker)){
   console.warn("FlightCompass: config.js marker must be your numeric Travelpayouts partner ID. Affiliate links stay off.");
   CFG.marker="";
@@ -1067,6 +1081,52 @@ function isAmexFHRDest(city){
   return city&&!!AMEX_FHR_CITIES[city];
 }
 
+// ============ HOTEL POINTS CHECK ============
+// Points or cash for a hotel stay (Felix's decision matrix, Oct 2026). Money in EUR, point values in
+// euro cents per point (€c). FHR perks for two count against the cash price: about €200 for the first
+// night (daily breakfast, US$100 credit, guaranteed 4pm checkout; upgrade and noon check-in only when
+// available) and about €90 for each extra night (breakfast).
+//   FHR available:  points only if they are worth more than 1.00 €c each after the FHR perks
+//   No FHR:         over 1.00 €c points · 0.75 to 1.00 depends on drawing down vs preserving · under 0.75 cash
+// Overrides: a gap under €100 between the options means take the better experience and stop
+// calculating; spend points when cash rates peak (New Year's Eve, Chinese New Year), pay cash at floors.
+var HPC={fhrFirst:200,fhrExtra:90,bar:1,low:0.75,floor:100};
+function fhrPerksValue(nights){
+  var n=Math.max(1,Math.round(nights||1));
+  return HPC.fhrFirst+HPC.fhrExtra*(n-1);
+}
+// First day of the lunar new year; the peak runs from its eve through day three
+var CNY_FIRST_DAYS=["2026-02-17","2027-02-06","2028-01-26","2029-02-13"];
+// Returns "New Year's Eve", "Chinese New Year" or "" for the nights from checkIn (YYYY-MM-DD)
+function peakEventInStay(checkIn,nights){
+  if(!checkIn||!/^\d{4}-\d{2}-\d{2}/.test(checkIn))return "";
+  var n=Math.max(1,Math.min(60,Math.round(nights||1)));
+  var t0=Date.UTC(+checkIn.slice(0,4),+checkIn.slice(5,7)-1,+checkIn.slice(8,10)),day=86400000;
+  var cny=CNY_FIRST_DAYS.map(function(s){return Date.UTC(+s.slice(0,4),+s.slice(5,7)-1,+s.slice(8,10));});
+  for(var i=0;i<n;i++){
+    var t=t0+i*day,d=new Date(t),m=d.getUTCMonth()+1,dd=d.getUTCDate();
+    if(m===12&&(dd===30||dd===31))return "New Year’s Eve";
+    for(var k=0;k<cny.length;k++){if(t>=cny[k]-day&&t<=cny[k]+2*day)return "Chinese New Year";}
+  }
+  return "";
+}
+// cash: EUR per night, pts: points per night, nights, fhr: FHR available for this hotel and dates
+function hotelPointsCheck(cash,pts,nights,fhr){
+  if(!(cash>0&&cash<=100000)||!(pts>0&&pts<=5000000)||!(nights>=1&&nights<=60))return null;
+  var n=Math.round(nights),cashTotal=cash*n,ptsTotal=pts*n;
+  var perks=fhr?fhrPerksValue(n):0;
+  var raw=cashTotal*100/ptsTotal,adj=(cashTotal-perks)*100/ptsTotal;
+  var action;
+  if(fhr)action=adj>HPC.bar?"Points":"Cash via FHR";
+  else if(raw>HPC.bar)action="Points";
+  else if(raw>=HPC.low)action="Points if drawing down, cash if preserving";
+  else action="Cash";
+  // Gap between the two options: cash after perks vs the points valued at the 1.00 €c bar
+  var gap=Math.abs((cashTotal-perks)-ptsTotal*HPC.bar/100);
+  return {n:n,cashTotal:cashTotal,ptsTotal:ptsTotal,perks:perks,raw:raw,adj:adj,action:action,gap:gap,
+    underFloor:gap<HPC.floor,rawBar:HPC.bar+perks*100/ptsTotal};
+}
+
 
 // ============ DEMO DATA (offline fallback) ============
 var DEMO={
@@ -1593,7 +1653,9 @@ function recommend(ap,country,cashEUR,ccys,saver,distKmVal){
   }
   var city=(ap.city||"").replace(/_/g," ").trim();
   var fhrEligible=isAmexFHRDest(city)||isAmexFHRDest(country.replace(/_/g," "));
-  var fhrSave=fhrEligible?150:0; // Avg value of FHR perks per stay (breakfast + credit + upgrades)
+  // FHR perks for two over the stay: ~€200 first night + ~€90 per extra night (one-way fares assume 5 nights)
+  var fhrNights=tripNights(ap)||5;
+  var fhrSave=fhrEligible?fhrPerksValue(fhrNights):0;
 
   // Hotel Geo: likelihood that regional OTA hotel-price variance is worth checking.
   // Markets with well-documented geo-pricing spreads (SEA, South Asia, LATAM, parts of
@@ -1657,9 +1719,9 @@ function recommend(ap,country,cashEUR,ccys,saver,distKmVal){
     winClass="w-cash";
     var ccyName=native?native.ccy:"EUR";
     headline='<span class="gn">Cash booking scores highest.</span> No special strategy beats the direct price.';
-    body=(saver?"Saver award isn't strong value here. ":"")+"Direct airline booking earns status credit; "+flightCB.platform+" via ShopBack adds "+flightCB.rate+"-"+flightCB.peak+"% cashback (~\u20AC"+cbSaving+"-\u20AC"+cbSavingPeak+"). "+(fhrEligible?"For the hotel side, Amex Platinum FHR offers ~\u20AC"+fhrSave+" in benefits at eligible properties.":"");
+    body=(saver?"Saver award isn't strong value here. ":"")+"Direct airline booking earns status credit; "+flightCB.platform+" via ShopBack adds "+flightCB.rate+"-"+flightCB.peak+"% cashback (~\u20AC"+cbSaving+"-\u20AC"+cbSavingPeak+"). "+(fhrEligible?"For the hotel side, Amex Platinum FHR adds ~\u20AC"+fhrSave+" in perks for two over "+fhrNights+" night"+(fhrNights===1?"":"s")+" at eligible properties.":"");
   }
-  return {winClass:winClass,headline:headline,body:body,scores:scores,winner:w,vpnSave:vpnSave,saverCashEq:saverCashEq,milesValue:milesValue,vCents:vCents,legs:legs,tripPts:tripPts,flightCB:flightCB,cbSaving:cbSaving,cbSavingPeak:cbSavingPeak,fhrEligible:fhrEligible,fhrSave:fhrSave,bizAnalysis:bizAnalysis};
+  return {fhrNights:fhrNights,winClass:winClass,headline:headline,body:body,scores:scores,winner:w,vpnSave:vpnSave,saverCashEq:saverCashEq,milesValue:milesValue,vCents:vCents,legs:legs,tripPts:tripPts,flightCB:flightCB,cbSaving:cbSaving,cbSavingPeak:cbSavingPeak,fhrEligible:fhrEligible,fhrSave:fhrSave,bizAnalysis:bizAnalysis};
 }
 
 // ============ MAP ============
@@ -2199,6 +2261,44 @@ function sbAirports(name,aps){
 }
 
 // ============ DETAIL PANEL ============
+// Hotel points check: renders the result and keeps typed values per destination while dates change
+var _hpcMemo={};
+function hpcResultHTML(r,checkIn,nights){
+  var peak=peakEventInStay(checkIn,nights>0?nights:1);
+  var regime=peak
+    ?'<strong style="color:var(--vi)">Peak dates:</strong> this stay includes '+peak+', when cash rates usually peak, so this is when to spend points.'
+    :'Spend points when cash rates peak (New Year\u2019s Eve, Chinese New Year); pay cash when they bottom out.';
+  if(!r)return '<div class="hpc-note">Enter the cash rate and the points price for your dates, both from the hotel\u2019s own site.</div><div class="hpc-note">'+regime+'</div>';
+  var col={"Points":"var(--vi)","Cash via FHR":"var(--gd)","Cash":"var(--gn)"}[r.action]||"var(--cy)";
+  var f2=function(v){return (v>0?v:0).toFixed(2);};
+  return '<div class="hpc-act" style="color:'+col+'">'+r.action+'</div>'
+    +'<div class="dr"><span class="dl">VALUE PER POINT</span><span class="dv">'+f2(r.raw)+' \u20ACc'+(r.perks?(' raw \u00B7 '+f2(r.adj)+' after FHR perks'):'')+'</span></div>'
+    +'<div class="dr"><span class="dl">BAR</span><span class="dv">'+(r.perks?('points win above '+r.rawBar.toFixed(2)+' \u20ACc raw'):'points above 1.00, cash below 0.75 \u20ACc')+'</span></div>'
+    +(r.perks?'<div class="dr"><span class="dl">FHR PERKS</span><span class="dv">'+eur(r.perks)+' over '+r.n+' night'+(r.n===1?'':'s')+'</span></div>':'')
+    +'<div class="dr"><span class="dl">GAP</span><span class="dv">~'+eur(Math.round(r.gap))+'</span></div>'
+    +'<div class="hpc-note">'+(r.underFloor
+      ?'<strong style="color:var(--gd)">Gap under \u20AC100:</strong> take the better experience and stop calculating.'
+      :'Gap over \u20AC100, so the matrix decides.')+'</div>'
+    +'<div class="hpc-note">'+regime+'</div>';
+}
+function wireHotelPointsCheck(ap,stayNights){
+  var c=gi("hpcCash"),p=gi("hpcPts"),n=gi("hpcN"),f=gi("hpcFhr"),out=gi("hpcOut");
+  if(!c||!p||!n||!f||!out)return;
+  var key=ap.code||"",memo=_hpcMemo[key]||{};
+  if(memo.cash)c.value=memo.cash;
+  if(memo.pts)p.value=memo.pts;
+  n.value=(memo.nTouched&&memo.n)?memo.n:(stayNights||5);
+  f.checked=!!memo.fhr;
+  function run(e){
+    if(e&&e.target===n)memo.nTouched=true;
+    memo.cash=c.value;memo.pts=p.value;memo.n=n.value;memo.fhr=f.checked;_hpcMemo[key]=memo;
+    var nights=parseInt(n.value,10);
+    out.innerHTML=hpcResultHTML(hotelPointsCheck(parseFloat(c.value),parseFloat(p.value),nights,f.checked),ap.depart_date,nights);
+  }
+  c.addEventListener("input",run);p.addEventListener("input",run);n.addEventListener("input",run);
+  f.addEventListener("change",run);
+  run();
+}
 function showDP(ap){
   try{
   var panel=gi("dp");
@@ -2269,7 +2369,7 @@ function showDP(ap){
     +'<div class="strat-item" data-icon="\uD83C\uDFAB"><strong>'+rec.flightCB.platform+' via ShopBack (cash + cashback)</strong>Activate ShopBack pre-click. Base '+rec.flightCB.rate+'% (~\u20AC'+rec.cbSaving+'), peak '+rec.flightCB.peak+'% (~\u20AC'+rec.cbSavingPeak+'). '+rec.flightCB.note+'</div>'
     +(saver?'<div class="strat-item" data-icon="\u2728"><strong>Miles redemption \u2014 only at saver rate</strong>'+(saver.exact?'The published saver chart shows ':'The typical low saver level is ')+'<strong>'+saver.pts.toLocaleString()+' '+saver.program+' pts each way</strong>'+(rec.legs===2?' ('+rec.tripPts.toLocaleString()+' for this round trip)':'')+' on this '+saver.tier+'-haul route. Burn miles <strong>only</strong> if you find saver inventory on your specific dates (Seats.aero or direct airline call). Standard awards cost 2-3x more points and destroy point value \u2014 paying cash is mathematically better in that case. Saver availability changes hourly; verify before committing.</div>':'')
     +'<div class="strat-item" data-icon="\uD83C\uDF10"><strong>Regional pricing variance (hotels)</strong>'+(ccys[0]&&ccys[0].isNative&&rec.vpnSave>0?('Flight prices on this route in EUR vs '+ccys[0].ccy+' differ by ~\u20AC'+rec.vpnSave+' (~4%). '):'')+'On the hotel side, OTAs like Booking.com and Agoda may show different rates for the same property depending on detected region \u2014 observed spreads typically run 5\u201320% in mature SEA, LATAM, and South Asia markets. Comparing rates from different regional starting points before committing surfaces these variations.</div>'
-    +(fhrEligible?'<div class="strat-item" data-icon="\u2B50"><strong>Amex Platinum FHR for the hotel (~\u20AC'+rec.fhrSave+' value)</strong>'+(ap.city||country).replace(/_/g," ")+' has FHR-eligible 4\u20135\u2605 hotels. Benefits: $100 property credit, free breakfast, 4pm late checkout, complimentary room upgrade where available. Real per-stay value ~\u20AC150\u2013200 even if FHR room rate matches OTA. Note: Pay With Points at 1\u00A2/pt is poor value for MR \u2014 use sparingly.</div>':'')
+    +(fhrEligible?'<div class="strat-item" data-icon="\u2B50"><strong>Amex Platinum FHR for the hotel (~\u20AC'+rec.fhrSave+' in perks over '+rec.fhrNights+' night'+(rec.fhrNights===1?'':'s')+')</strong>'+(ap.city||country).replace(/_/g," ")+' has FHR-eligible 4\u20135\u2605 hotels. Benefits for two: daily breakfast, US$100 property credit and guaranteed 4pm checkout; room upgrade and noon check-in when available. Counted at about \u20AC200 for the first night and \u20AC90 per extra night. FHR rates can run above other channels, so compare the net price, and run the points check above for chain hotels. Note: Pay With Points at 1\u00A2/pt is poor value for MR \u2014 use sparingly.</div>':'')
     +'<div class="strat-item" data-icon="\uD83C\uDFE8"><strong>Hotel via '+hotelCB.platform+' (separate booking)</strong>Best hotel cashback for this region: '+hotelCB.platform+' (base '+hotelCB.rate+'%, peak '+hotelCB.peak+'%). '+hotelCB.note+'</div>';
 
   
@@ -2329,6 +2429,17 @@ function showDP(ap){
     +' Hotel figure is a hand-curated 4\u2605 median benchmark, not a live rate'+(stayNights?'; nights follow this fare\u2019s dates.':'; one-way fare, so 5 nights are assumed.')
     +'</div>';
 
+  var hpcHTML='<hr class="ddiv"><div class="dpt"><span class="dpt-icon">\uD83C\uDFE8</span>HOTEL \u00B7 POINTS OR CASH</div>'
+    +'<div class="hpc-grid">'
+    +'<label class="hpc-f">Cash / night (\u20AC)<input id="hpcCash" type="number" inputmode="decimal" min="0" step="any" placeholder="e.g. 320" autocomplete="off"></label>'
+    +'<label class="hpc-f">Points / night<input id="hpcPts" type="number" inputmode="numeric" min="0" step="1" placeholder="e.g. 40000" autocomplete="off"></label>'
+    +'<label class="hpc-f">Nights<input id="hpcN" type="number" inputmode="numeric" min="1" max="60" step="1" autocomplete="off"></label>'
+    +'<label class="hpc-f hpc-chk"><input id="hpcFhr" type="checkbox">FHR available</label>'
+    +'</div>'
+    +(fhrEligible?'<div class="hpc-hint">'+(ap.city||country).replace(/_/g," ")+' has FHR hotels. Tick the box if yours offers FHR for your dates.</div>':'')
+    +'<div id="hpcOut" aria-live="polite"></div>'
+    +'<div class="disclaim">With FHR, points must be worth more than 1.00 \u20ACc each after the FHR perks. Without FHR, points win above 1.00 \u20ACc and cash below 0.75 \u20ACc; in between it depends on whether you are drawing points down. FHR perks for two count as about \u20AC200 for the first night (breakfast, US$100 credit, guaranteed 4pm checkout; upgrade and noon check-in only when available) and \u20AC90 per extra night. Gap = cash after perks minus the points valued at 1.00 \u20ACc each. Taxes and resort fees are not included; on Marriott award stays of five nights the cheapest night is free, so enter the average points per night.</div>';
+
   panel.innerHTML=
     '<div class="rec-box '+rec.winClass+'">'
     +'<div class="rec-eyebrow"><div class="rec-dot" style="background:'+dotClr+'"></div>FLIGHTCOMPASS RECOMMENDATION</div>'
@@ -2340,7 +2451,7 @@ function showDP(ap){
     +'<div style="width:1px;align-self:stretch;background:var(--bd);margin-top:14px"></div>'
     +'<div style="flex:0 0 auto;width:78px"><div style="font-family:DM Mono,monospace;font-size:7px;color:var(--mt2);letter-spacing:.6px;text-transform:uppercase;margin-bottom:5px">\uD83C\uDFE8 Hotel</div><div class="rec-scores rec-scores-hotel">'+hotelScoreHTML+'</div></div>'
     +'</div>'
-    +'<div style="font-family:DM Mono,monospace;font-size:9px;color:var(--mt);margin-top:11px;line-height:1.85;padding-top:9px;border-top:1px solid var(--bd)"><div style="margin-bottom:3px"><span style="color:var(--gn);font-weight:700">\u2022 Cash/CCY</span> &mdash; flight prices in native currency typically ~4% cheaper than the EUR-converted equivalent</div><div style="margin-bottom:3px"><span style="color:var(--vi);font-weight:700">\u2022 Miles</span> &mdash; saver award value vs cash; sweet spot \u2265 \u20AC1.40 per 1K points</div><div style="margin-bottom:3px"><span style="color:var(--or);font-weight:700">\u2022 Cashback</span> &mdash; ShopBack flight rate, peak around 6% via Trip.com</div><div><span style="color:var(--cy);font-weight:700">\u2022 Hotel Geo</span> &mdash; <em>accommodation, not flight</em>: hotel OTAs may display different rates depending on detected region (typical spread 5\u201320%)</div></div></div>'
+    +'<div style="font-family:DM Mono,monospace;font-size:9px;color:var(--mt);margin-top:11px;line-height:1.85;padding-top:9px;border-top:1px solid var(--bd)"><div style="margin-bottom:3px"><span style="color:var(--gn);font-weight:700">\u2022 Cash/CCY</span> &mdash; flight prices in native currency typically ~4% cheaper than the EUR-converted equivalent</div><div style="margin-bottom:3px"><span style="color:var(--vi);font-weight:700">\u2022 Miles</span> &mdash; saver award value vs cash; strongest when the points are worth under ~75% of the fare</div><div style="margin-bottom:3px"><span style="color:var(--or);font-weight:700">\u2022 Cashback</span> &mdash; ShopBack flight rate, peak around 6% via Trip.com</div><div><span style="color:var(--cy);font-weight:700">\u2022 Hotel Geo</span> &mdash; <em>accommodation, not flight</em>: hotel OTAs may display different rates depending on detected region (typical spread 5\u201320%)</div></div></div>'
 
     +'<div class="dpt"><span class="dpt-icon">\u2708</span>DEAL \u00B7 '+ST.origin+' \u2192 '+(ap.code||"?")+'</div>'
     +'<div class="dr"><span class="dl">CASH PRICE</span><span class="dv gn">'+eur(cashEUR)+' '+(isRT?'round trip':'one-way')+'</span></div>'
@@ -2358,6 +2469,7 @@ function showDP(ap){
     })()
     +otherDatesHTML
     +tripCostHTML
+    +hpcHTML
 
     +'<hr class="ddiv"><div class="dpt"><span class="dpt-icon">\uD83D\uDCB1</span>BOOKING CURRENCY</div>'
     +'<table class="ctable"><tr><th></th><th>CCY</th><th>Price</th><th>EUR</th><th></th></tr>'+ccyRows+'</table>'
@@ -2381,6 +2493,7 @@ function showDP(ap){
     +'<div class="strategy-list"><div class="dpt"><span class="dpt-icon">\uD83E\uDDED</span>BOOKING STRATEGY</div>'+strategyItems+'</div>'
 
     +'<div class="disclaim" style="margin-top:10px">Snapshot price is up to 7 days old (Aviasales cache). Always verify on the airline\u2019s direct site before booking. Currency conversion, taxes, and seat selection fees may differ between channels.</div>';
+  wireHotelPointsCheck(ap,stayNights);
 
   } catch(e){
     console.error("showDP render error:",e.message,e.stack);
