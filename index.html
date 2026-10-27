@@ -53,10 +53,10 @@
 }
 </script>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%2304080f'/%3E%3Ccircle cx='50' cy='50' r='28' fill='none' stroke='%2300d4ff' stroke-width='3'/%3E%3Cpath d='M50 22 L54 50 L78 54 L54 50 L50 78 L46 50 L22 46 L46 50 Z' fill='%2300e8a0'/%3E%3Ccircle cx='50' cy='50' r='3' fill='%23b57aff'/%3E%3C/svg%3E">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<script src="vendor/d3-7.8.5.min.js"></script>
+<script src="vendor/topojson-3.0.2.min.js"></script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Cabinet+Grotesk:wght@400;700;800;900&display=swap');
+@import url('fonts/fonts.css');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden}
 :root{--bg:#04080f;--s1:#0a1220;--s2:#0f1a2e;--bd:#1c304d;--bd2:#243d5e;--cy:#00d4ff;--cy2:rgba(0,212,255,.12);--gn:#00e8a0;--gn2:rgba(0,232,160,.1);--vi:#b57aff;--vi2:rgba(181,122,255,.12);--or:#ff7c3a;--or2:rgba(255,124,58,.1);--gd:#ffc857;--gd2:rgba(255,200,87,.1);--tx:#d8e8f8;--mt:#4a6a8a;--mt2:#2a4a6a}
@@ -1725,16 +1725,15 @@ function recommend(ap,country,cashEUR,ccys,saver,distKmVal){
 }
 
 // ============ MAP ============
-var MAP_CDNS=[
-  "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json",
-  "https://unpkg.com/world-atlas@2/countries-110m.json",
-  "https://raw.githubusercontent.com/topojson/world-atlas/master/countries-110m.json"
+// The world atlas is served from this site (vendor/, see vendor/README.md), so visitors make no third-party requests.
+var MAP_SOURCES=[
+  "vendor/world-atlas-2.0.2-countries-110m.json"
 ];
 function fetchWorldAtlas(idx){
   idx=idx||0;
-  if(idx>=MAP_CDNS.length)return Promise.reject(new Error("all CDNs failed"));
-  return d3.json(MAP_CDNS[idx]).catch(function(){
-    console.warn("CDN "+(idx+1)+" failed, trying next");
+  if(idx>=MAP_SOURCES.length)return Promise.reject(new Error("world atlas failed to load"));
+  return d3.json(MAP_SOURCES[idx]).catch(function(){
+    console.warn("Map source "+(idx+1)+" failed, trying next");
     return fetchWorldAtlas(idx+1);
   });
 }
