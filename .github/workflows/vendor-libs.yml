@@ -39,21 +39,30 @@ jobs:
             [ "$found" = 1 ] || { echo "::error::no license file in $pkg"; exit 1; }
           done
           compare() {
-            if curl -fsSL "$1" | cmp -s - "$2"; then echo "| $(basename "$2") | identical to $1 |"; else echo "| $(basename "$2") | DIFFERS from $1 |"; fi
+            if curl -fsSL "$1" | cmp -s - "$2"; then verdict="identical to $1"; else verdict="DIFFERS from $1"; fi
+            echo "| $(basename "$2") | $3 | $verdict |"
           }
           {
-            echo "### Vendored files"
+            echo "# Vendored map libraries"
             echo ""
-            echo "| File | CDN check |"
-            echo "|---|---|"
-            compare https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js vendor/d3-7.8.5.min.js
-            compare https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js vendor/topojson-3.0.2.min.js
-            compare https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json vendor/world-atlas-2.0.2-countries-110m.json
+            echo "Copied from the npm registry (npm verifies each package's integrity) by"
+            echo "\`.github/workflows/vendor-libs.yml\` on $(date -u +%F), and compared byte for byte with the CDN"
+            echo "copies the page loaded before, so the code that runs is unchanged. Licenses are kept next to the files."
+            echo ""
+            echo "| File | npm package | CDN check |"
+            echo "|---|---|---|"
+            compare https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js vendor/d3-7.8.5.min.js "d3@7.8.5, dist/d3.min.js"
+            compare https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js vendor/topojson-3.0.2.min.js "topojson@3.0.2, dist/topojson.min.js"
+            compare https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json vendor/world-atlas-2.0.2-countries-110m.json "world-atlas@2.0.2, countries-110m.json"
+            echo ""
+            echo "SHA-256:"
             echo ""
             echo '```'
-            sha256sum vendor/*
+            sha256sum vendor/*.js vendor/*.json
             echo '```'
-          } | tee -a "$GITHUB_STEP_SUMMARY"
+          } > "$work/README.md"
+          mv "$work/README.md" vendor/README.md
+          tee -a "$GITHUB_STEP_SUMMARY" < vendor/README.md
 
       - name: Commit
         run: |
@@ -65,5 +74,5 @@ jobs:
             echo "nothing to commit"
             exit 0
           fi
-          git commit -m "Vendor d3 7.8.5, topojson 3.0.2 and world-atlas 2.0.2 from npm"
+          git commit -m "Vendor d3 7.8.5, topojson 3.0.2 and world-atlas 2.0.2 from npm, with a record of the checks"
           git push origin "HEAD:${GITHUB_REF_NAME}"
