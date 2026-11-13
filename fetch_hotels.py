@@ -211,7 +211,8 @@ def main() -> int:
             print(f"  results: {len(results)}")
             print("  first result:")
             for k, v in results[0].items():
-                print(f"    {k}: {str(v)[:90]}")
+                # landingURL in full (public: site ID and hotel ID only), so page links can follow Agoda's format
+                print(f"    {k}: {v if k == 'landingURL' else str(v)[:90]}")
             rates = four_star_rates(payload)
             if rates:
                 print(f"  4-star hotels: {len(rates)}, median EUR {statistics.median(rates):.0f}, range {min(rates):.0f} to {max(rates):.0f}")
