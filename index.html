@@ -1620,6 +1620,9 @@ function snapshotPriceToEUR(item){
 
 
 // Convert a city/airport pair to approx distance from origin (haversine, km)
+// Distance from a fare's departure airport (a nearby one the fare data included, or the chosen origin);
+// the chosen origin stands in for an airport the coordinates table lacks
+function fareDistKm(dep,destCode){return distKm(dep&&ACOORDS[dep]?dep:ST.origin,destCode);}
 function distKm(originCode,destCode){
   var a=ACOORDS[originCode],b=ACOORDS[destCode];
   if(!a||!b)return 5000;
@@ -1880,7 +1883,7 @@ function onHover(event,d){
   if(r){
     var ccys=bestCCY(name,r.cash);
     if(ST.mode!=="miles")h+='<div class="tts">'+eur(r.cash)+' \u00B7 '+ccys[0].sym+ccys[0].amount+' '+ccys[0].ccy+'</div>';
-    if(ST.mode==="miles"){var sv=bestSaverForDest(ST.origin,name,distKm(r.dep||ST.origin,r.code),r.code);if(sv)h+='<div class="ttm">'+Math.round(sv.pts/1000)+'K '+sv.program.split(" ")[0]+' saver</div>';}
+    if(ST.mode==="miles"){var sv=bestSaverForDest(ST.origin,name,fareDistKm(r.dep,r.code),r.code);if(sv)h+='<div class="ttm">'+Math.round(sv.pts/1000)+'K '+sv.program.split(" ")[0]+' saver</div>';}
     if(ST.mode==="cashback"){var fcb=flightCashbackPick();h+='<div class="ttc">'+fcb.platform+': up to '+fcb.peak+'%</div>';}
   }
   tt.innerHTML=h;
@@ -2120,7 +2123,7 @@ function drawPins(rows,type){
       botLine=fcb.platform;
       fillC="#1a0800";strokeC="#ff7c3a";textC="#ff7c3a";
     } else if(ST.mode==="miles"){
-      var sv=bestSaverForDest(ST.origin,name,distKm(r.dep||ST.origin,r.code),r.code);
+      var sv=bestSaverForDest(ST.origin,name,fareDistKm(r.dep,r.code),r.code);
       if(sv){topLine=Math.round(sv.pts/1000)+"K";botLine=sv.program.split(" ")[0];}
       else{topLine=eur(r.cash);botLine=name.replace(/_/g," ");}
       fillC="#12082e";strokeC="#b57aff";textC="#b57aff";
@@ -2215,7 +2218,7 @@ function sbCountries(cont,rows){
   gi("sbl").innerHTML=rows.map(function(r,i){
     var isBest=i===0;
     var bc=bestCCY(r.country,r.cash)[0];
-    var sv=isMi?bestSaverForDest(ST.origin,r.country,distKm(r.dep||ST.origin,r.code),r.code):null;
+    var sv=isMi?bestSaverForDest(ST.origin,r.country,fareDistKm(r.dep,r.code),r.code):null;
     var fcb=isCb?flightCashbackPick():null;
     var pp=isMi&&sv?(Math.round(sv.pts/1000)+"K pts"):isCb?("up to "+fcb.peak+"%"):eur(r.cash);
     var ps=isMi&&sv?sv.program:isCb?fcb.platform:(bc.sym+bc.amount+" "+bc.ccy);
@@ -2254,7 +2257,7 @@ function sbAirports(name,aps){
   gi("sbl").innerHTML=aps.map(function(a,i){
     var isBest=i===0;
     var bc=bestCCY(name,a.cash)[0];
-    var sv=isMi?bestSaverForDest(ST.origin,name,distKm(a.dep||ST.origin,a.code),a.code):null;
+    var sv=isMi?bestSaverForDest(ST.origin,name,fareDistKm(a.dep,a.code),a.code):null;
     var fcb=isCb?flightCashbackPick():null;
     var pp=isMi&&sv?(Math.round(sv.pts/1000)+"K"):isCb?("up to "+fcb.peak+"%"):eur(a.cash);
     var ps=isMi&&sv?sv.program:isCb?fcb.platform:(bc.sym+bc.amount+" "+bc.ccy);
@@ -2331,7 +2334,7 @@ function showDP(ap){
   var cashEUR=ap.cash||0;
   // The airport this fare departs from: the chosen origin, or a nearby one the fare data included
   var dep=ap.dep||ST.origin;
-  var dist=distKm(dep,ap.code);
+  var dist=fareDistKm(dep,ap.code);
   var saver=bestSaverForDest(ST.origin,country,dist,ap.code);
   var ccys=bestCCY(country,cashEUR);
   var rec=recommend(ap,country,cashEUR,ccys,saver,dist);
