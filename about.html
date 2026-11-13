@@ -95,7 +95,7 @@ footer a{color:var(--cy);border-bottom:none}
 <ul>
   <li><strong>Award charts</strong>: economy saver rates, reviewed October 2026. KrisFlyer, Lufthansa Miles &amp; More, ANA Mileage Club, Asia Miles, and Qantas Frequent Flyer publish fixed charts, so the tool prices them for the exact airport pair (by zone, region, or distance flown). British Airways Avios, Flying Blue, Emirates Skywards, Qatar Privilege Club, and United MileagePlus price dynamically or publish no chart; for these the tool uses observed current price levels and labels them indicative</li>
   <li><strong>Cashback rates</strong>: historical peak rates for ShopBack flight and hotel platforms — Trip.com, Klook, Kiwi, Booking.com, Agoda, Hotels.com</li>
-  <li><strong>Hotel benchmarks</strong>: median 4-star nightly rates for approximately 100 major cities, used in the trip-cost optimizer. These are reference values, not live rates: no hotel price API is available to Travelpayouts partners since Hotellook closed in October 2025</li>
+  <li><strong>Hotel rates</strong>: used in the trip-cost check for approximately 100 major cities. Where available, the figure is the median nightly rate of 4-star hotels on Agoda for one sample stay (two nights, two adults, about four weeks ahead, before taxes), refreshed weekly through the Agoda affiliate API. Where no fresh Agoda figure exists, a hand-curated 4-star benchmark is used and labeled as such. Either way it is a reference level, not a quote for your dates</li>
   <li><strong>Amex FHR eligibility</strong>: list of major luxury markets typically appearing in the Fine Hotels &amp; Resorts catalog</li>
 </ul>
 
@@ -114,7 +114,7 @@ footer a{color:var(--cy);border-bottom:none}
 <p>The recommendation engine surfaces the strategy that scores highest for a given route — with full transparency about scores, methodology, and trade-offs. When direct airline booking is the strongest option (for status credit, flexibility, and clean cancellation), the engine surfaces that. When a saver-rate award redemption beats the cash fare, the engine surfaces that. When OTA cashback provides the best net value, the engine surfaces that. No affiliate-linked option is highlighted simply because it generates revenue.</p>
 
 <div class="callout">
-<strong>On affiliate links:</strong> the tool optionally includes a Travelpayouts affiliate marker that activates a "Check live price on Aviasales" link in the detail panel. It stays off unless a partner ID is set in a separate configuration file, and it never changes the scoring: the affiliate path is one option among many, not the highlighted recommendation. When affiliate links are active, a footer disclosure appears, and outbound links carry the appropriate <code>rel="sponsored"</code> semantics for FTC compliance.
+<strong>On affiliate links:</strong> the tool optionally includes two affiliate links in the detail panel: "Check live price on Aviasales" for flights (Travelpayouts) and "Check hotel prices on Agoda" for hotels (Agoda affiliate program). Each stays off unless its partner ID is set in a separate configuration file, and neither changes the scoring: the affiliate path is one option among many, not the highlighted recommendation. When affiliate links are active, a footer disclosure appears, and outbound links carry the appropriate <code>rel="sponsored"</code> semantics for FTC compliance.
 </div>
 
 <h2>What FlightCompass is not</h2>

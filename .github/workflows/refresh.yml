@@ -12,6 +12,11 @@ on:
         description: "Optional departure month, YYYY-MM (leave empty for all dates)"
         required: false
         default: ""
+      hotel_probe:
+        description: "Agoda test only: fetch Bangkok hotel rates, print the result, change nothing"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: write
@@ -35,6 +40,7 @@ jobs:
           python-version: "3.12"
 
       - name: Fetch Travelpayouts snapshot
+        if: ${{ github.event.inputs.hotel_probe != 'true' }}
         env:
           TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
           # Passed through the environment, not pasted into the script, so the input can't inject shell code
@@ -60,17 +66,41 @@ jobs:
             python3 fetch_snapshot.py
           fi
 
+      # Hotel rates are optional: without the AGODA_API_KEY secret the step skips itself, and a failed
+      # run leaves the previous hotel-data.json in place (the page falls back to its benchmarks).
+      - name: Fetch Agoda hotel rates
+        continue-on-error: true
+        env:
+          AGODA_API_KEY: ${{ secrets.AGODA_API_KEY }}
+          AGODA_SITE_ID: "1979359"
+          HOTEL_PROBE: ${{ github.event.inputs.hotel_probe }}
+        run: |
+          if [ -z "$AGODA_API_KEY" ]; then
+            echo "AGODA_API_KEY secret is not set; skipping hotel rates."
+            exit 0
+          fi
+          if [ ! -f "fetch_hotels.py" ]; then
+            echo "::warning::fetch_hotels.py not found in repo root; skipping hotel rates."
+            exit 0
+          fi
+          if [ "$HOTEL_PROBE" = "true" ]; then
+            python3 fetch_hotels.py --probe
+          else
+            python3 fetch_hotels.py || { echo "::warning::Agoda hotel fetch failed; the previous hotel-data.json stays in place."; exit 1; }
+          fi
+
       - name: Commit and push if changed
+        if: ${{ github.event.inputs.hotel_probe != 'true' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # Stage only the flight snapshot. (The old step also staged hotel-data.json; when that file
-          # is absent, "git add" aborts and the weekly commit silently fails.)
+          # Stage each data file only if it exists ("git add" of a missing file aborts the whole commit).
           git add flight-data.json
+          if [ -f hotel-data.json ]; then git add hotel-data.json; fi
           if git diff --cached --quiet; then
             echo "No changes to snapshot."
           else
-            git commit -m "Refresh flight-data.json [skip ci]"
+            git commit -m "Refresh flight and hotel data [skip ci]"
             git push
             echo "Snapshot refreshed and committed."
           fi

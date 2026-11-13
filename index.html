@@ -374,8 +374,8 @@ label.h-stacked{padding:0 14px}
     <h2 style="font-size:17px">About FlightCompass</h2>
     <div style="font-family:DM Mono,monospace;font-size:10.5px;color:var(--mt);line-height:1.75">
       <p style="margin-bottom:10px"><strong style="color:var(--tx)">A research-oriented strategy explorer</strong>, not a booking platform. Built by Felix Diego Langer as part of doctoral research in business administration (DBA) at GlobalNxt University.</p>
-      <p style="margin-bottom:10px"><strong style="color:var(--tx)">Methodology:</strong> Flight prices are sourced from the Aviasales/Travelpayouts cache (refreshed weekly, up to 7 days stale). Award prices follow each program's published chart where one exists and observed price levels where it does not (reviewed October 2026). Cashback rates and hotel benchmarks are hand-curated. The recommendation engine compares multiple booking strategies on a per-route basis using transparent scoring formulas.</p>
-      <p style="margin-bottom:10px"><strong style="color:var(--tx)">Editorial principle:</strong> honest analysis first, monetization-aware second. Affiliate links never influence the scoring: every route is ranked the same way whether or not a link earns a commission. When another path scores higher, such as direct airline booking, a miles redemption, or hotel partner perks, the analysis says so, and no commission is earned on those paths. Affiliate links are labeled in the panel and disclosed in the footer.</p>
+      <p style="margin-bottom:10px"><strong style="color:var(--tx)">Methodology:</strong> Flight prices are sourced from the Aviasales/Travelpayouts cache (refreshed weekly, up to 7 days stale). Award prices follow each program's published chart where one exists and observed price levels where it does not (reviewed October 2026). Hotel rates are weekly 4-star medians from Agoda where available and hand-curated benchmarks elsewhere; cashback rates are hand-curated. The recommendation engine compares multiple booking strategies on a per-route basis using transparent scoring formulas.</p>
+      <p style="margin-bottom:10px"><strong style="color:var(--tx)">Editorial principle:</strong> honest analysis first, monetization-aware second. Affiliate links never influence the scoring: every route is ranked the same way whether or not a link earns a commission. When another path scores higher, such as direct airline booking, a miles redemption, or hotel partner perks, the analysis says so, and no commission is earned on those paths. Affiliate links (Aviasales for flights, Agoda for hotels) are labeled in the panel and disclosed in the footer.</p>
       <p style="margin-bottom:10px"><strong style="color:var(--tx)">Contact:</strong> reach me on <a href="https://www.linkedin.com/in/felix-langer-2a8425168/" target="_blank" rel="noopener" style="color:var(--cy);text-decoration:none">LinkedIn</a> for questions, corrections, or research collaboration.</p>
       <p style="margin-bottom:10px"><strong style="color:var(--tx)">Data &amp; privacy:</strong> no cookies, no tracking, no personal data collected by this page. Affiliate clicks redirect to external services with their own privacy policies.</p>
       <p style="font-size:9px;opacity:.7">Not financial advice. Not a booking tool. Always verify prices, award availability, cashback rates, and FHR perks on the actual booking site before transacting. Currency conversion, taxes, and fees may vary by channel.</p>
@@ -475,8 +475,13 @@ label.h-stacked{padding:0 14px}
 var FC_CFG=(window.FC_CONFIG&&typeof window.FC_CONFIG==="object")?window.FC_CONFIG:{};
 var CFG={
   marker:String(FC_CFG.marker==null?"":FC_CFG.marker).trim(),
-  subid:"flightcompass"  // SubID prefix; Travelpayouts reads it as marker=<ID>.<SubID>
+  subid:"flightcompass",  // SubID prefix; Travelpayouts reads it as marker=<ID>.<SubID>
+  agodaCid:String(FC_CFG.agodaCid==null?"":FC_CFG.agodaCid).trim()  // Agoda site ID (public)
 };
+if(CFG.agodaCid&&!/^\d{3,12}$/.test(CFG.agodaCid)){
+  console.warn("FlightCompass: config.js agodaCid must be your numeric Agoda site ID. Agoda links stay off.");
+  CFG.agodaCid="";
+}
 // Travelpayouts partner IDs are numeric; anything else (a pasted URL, "marker=...") is ignored.
 if(/^[0-9a-f]{32}$/i.test(CFG.marker)){
   console.error("FlightCompass: config.js holds what looks like your Travelpayouts API token. Remove it, update the token in Travelpayouts, and keep it only in GitHub Actions secrets.");
@@ -1072,7 +1077,17 @@ var AMEX_FHR_CITIES={
 
 // Hotel nightly rate for the trip-cost check. Hand-curated 4-star medians: Travelpayouts closed
 // Hotellook (and its API) on 20 Oct 2025 and offers no other hotel API, so there is no live feed.
+// Live 4-star medians from Agoda (hotel-data.json, refreshed weekly). null until loaded, and ignored
+// when the file is missing, malformed or more than 21 days old, so the benchmarks below take over.
+var HOTEL_LIVE=null;
+function liveHotel(city){
+  if(!HOTEL_LIVE||!city)return null;
+  var h=HOTEL_LIVE.cities[city];
+  return (h&&typeof h.rate==="number"&&h.rate>5&&h.rate<5000)?h:null;
+}
 function getNightlyRate(country,city){
+  var live=liveHotel(city);
+  if(live)return Math.round(live.rate);
   if(city&&HOTEL_RATES_EUR[city])return HOTEL_RATES_EUR[city];
   if(country&&COUNTRY_RATE_FALLBACK[country])return COUNTRY_RATE_FALLBACK[country];
   return 120; // global median fallback
@@ -2417,6 +2432,27 @@ function showDP(ap){
   }
 
   var contLabel=(cont||"this region");
+  var hotelCity=(ap.city||"").replace(/_/g," "),hotelLive=liveHotel(hotelCity);
+  var hotelNote;
+  if(hotelLive){
+    var hm=HOTEL_LIVE.meta||{};
+    hotelNote=' Hotel figure: median of '+(hotelLive.n||"")+' 4\u2605 hotels on Agoda for a sample '+(hm.nights||2)+'-night stay'+(hm.check_in?(' from '+fmtShortDate(hm.check_in)):'')+', before taxes, fetched '+fmtShortDate(String(hm.fetched_at||"").slice(0,10))+'. Rates for your dates can differ'+(stayNights?'; nights follow this fare\u2019s dates.':'; one-way fare, so 5 nights are assumed.');
+  } else {
+    hotelNote=' Hotel figure is a hand-curated 4\u2605 median benchmark, not a live rate'+(stayNights?'; nights follow this fare\u2019s dates.':'; one-way fare, so 5 nights are assumed.');
+  }
+  var agodaHTML="";
+  if(CFG.agodaCid&&hotelLive&&hotelLive.id){
+    var aUrl="https://www.agoda.com/partners/partnersearch.aspx?pcs=1&cid="+encodeURIComponent(CFG.agodaCid)+"&city="+encodeURIComponent(hotelLive.id);
+    var today2=todayISO(),aDates="";
+    if(ap.depart_date&&ap.return_date&&ap.depart_date>=today2&&ap.return_date>ap.depart_date){
+      aUrl+="&checkIn="+ap.depart_date+"&checkOut="+ap.return_date;
+      aDates=" \u00B7 "+fmtShortDate(ap.depart_date)+" \u2192 "+fmtShortDate(ap.return_date);
+    }
+    agodaHTML='<div style="margin-top:10px;padding:10px 12px;background:rgba(0,212,255,.04);border:1px solid var(--bd);border-radius:7px;text-align:center">'
+      +'<a href="'+aUrl+'" target="_blank" rel="noopener nofollow sponsored" style="display:inline-block;border:1px solid var(--cy);color:var(--cy);font-weight:800;font-size:12px;padding:8px 16px;border-radius:5px;text-decoration:none;letter-spacing:.3px">Check hotel prices on Agoda \u2192</a>'
+      +'<div style="font-family:DM Mono,monospace;font-size:8px;color:var(--mt);margin-top:7px;line-height:1.5">Opens hotels in '+hotelCity+aDates+'. Affiliate link \u2014 see footer.</div>'
+      +'</div>';
+  }
   var tripCostHTML='<hr class="ddiv"><div class="dpt"><span class="dpt-icon">\uD83D\uDCA1</span>TRIP COST CHECK</div>'
     +'<div class="dr"><span class="dl">FLIGHT</span><span class="dv">'+eur(cashEUR)+'</span></div>'
     +'<div class="dr"><span class="dl">HOTEL \u00B7 '+nights+' NIGHT'+(nights===1?'':'S')+(stayNights?'':' (ASSUMED)')+'</span><span class="dv">'+eur((nightlyRate*nights))+' ('+nightlyRate+'/night)</span></div>'
@@ -2425,8 +2461,9 @@ function showDP(ap){
     +(betterAlternative
       ?'<strong style="color:var(--gd)">Cheaper net trip available:</strong> '+betterAlternative.country.replace(/_/g," ")+' at '+eur(betterAlternative.cash)+' flight + '+eur(betterAlternative.nightly)+'/night = '+eur(betterAlternative.total)+' total. Saves ~'+eur(totalTripCost-betterAlternative.total)+' over '+nights+' nights vs '+country.replace(/_/g," ")+'. Cheap flight + expensive hotel often loses to mid flight + cheap hotel.'
       :'No clearly cheaper trip-cost alternative in '+contLabel+'. This destination optimises well on flight + accommodation combined.')
-    +' Hotel figure is a hand-curated 4\u2605 median benchmark, not a live rate'+(stayNights?'; nights follow this fare\u2019s dates.':'; one-way fare, so 5 nights are assumed.')
-    +'</div>';
+    +hotelNote
+    +'</div>'
+    +agodaHTML;
 
   var hpcHTML='<hr class="ddiv"><div class="dpt"><span class="dpt-icon">\uD83C\uDFE8</span>HOTEL \u00B7 POINTS OR CASH</div>'
     +'<div class="hpc-grid">'
@@ -2547,11 +2584,10 @@ function startApp(){
   // Affiliate disclosure: only shown when marker is configured
   var disc=gi("affDisclosure");
   if(disc){
-    if(CFG.marker){
-      disc.innerHTML='\u00B7 Contains affiliate links (Aviasales)';
-    } else {
-      disc.innerHTML='';
-    }
+    var partners=[];
+    if(CFG.marker)partners.push("Aviasales");
+    if(CFG.agodaCid&&HOTEL_LIVE)partners.push("Agoda");
+    disc.innerHTML=partners.length?('\u00B7 Contains affiliate links ('+partners.join(", ")+')'):'';
   }
   // Wire date picker + flex toggle with hard JS clamping (iOS Safari ignores min/max sometimes)
   var ms=gi("hMonth"),fx=gi("hFlexChk"),msWrap=gi("hMonthWrap");
@@ -2601,6 +2637,25 @@ function startApp(){
   initMap(function(){
     if(ST.level==="continent"&&ST.continent)drillContinent(ST.continent);
     else if(ST.level==="country"&&ST.country)drillCountry(ST.country,ST.countryISO);
+  });
+}
+// Hotel rates are optional: this never rejects and never delays the boot by more than 4 seconds
+function tryLoadHotels(){
+  var f=fetch("hotel-data.json",{cache:"no-cache"}).then(function(r){
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    return r.json();
+  }).then(function(d){
+    if(!d||typeof d.cities!=="object"||!d.cities||Array.isArray(d.cities))throw new Error("invalid format");
+    var t=Date.parse((d.meta&&d.meta.fetched_at)||"");
+    if(isNaN(t))throw new Error("no hotel fetch yet");
+    if(Date.now()-t>21*86400000)throw new Error("older than 21 days");
+    HOTEL_LIVE={meta:d.meta||{},cities:d.cities};
+    return true;
+  });
+  var timeout=new Promise(function(_,reject){setTimeout(function(){reject(new Error("timeout"));},4000);});
+  return Promise.race([f,timeout]).catch(function(e){
+    console.info("Live hotel rates unavailable, using benchmarks:",e.message);
+    return false;
   });
 }
 function tryLoadSnapshot(){
@@ -2713,7 +2768,7 @@ window.addEventListener("resize",function(){
 });
 
 // Boot: try snapshot, fall through to demo if missing.
-tryLoadSnapshot().then(function(){startApp();});
+Promise.all([tryLoadSnapshot(),tryLoadHotels()]).then(function(){startApp();});
 })();
 </script>
 
