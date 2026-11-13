@@ -21,6 +21,7 @@ import argparse
 import gzip
 import json
 import os
+import re
 import statistics
 import sys
 import time
@@ -174,7 +175,13 @@ def main() -> int:
     args = parser.parse_args()
 
     site_id = (os.environ.get("AGODA_SITE_ID") or "").strip()
-    api_key = (os.environ.get("AGODA_API_KEY") or "").strip()
+    api_key = (os.environ.get("AGODA_API_KEY") or "").strip().strip('"').strip("'").strip()
+    # Accept a secret pasted in the header's own "siteid:apikey" form; the site ID in it belongs to the key
+    m = re.fullmatch(r"(\d{3,12})\s*:\s*(\S+)", api_key)
+    if m:
+        if m.group(1) != site_id:
+            print(f"Note: the API key secret includes site ID {m.group(1)}; using that site ID.")
+        site_id, api_key = m.group(1), m.group(2)
     if not site_id.isdigit() or not api_key:
         print("ERROR: set AGODA_SITE_ID (numeric) and AGODA_API_KEY.", file=sys.stderr)
         return 2
@@ -186,7 +193,13 @@ def main() -> int:
         try:
             status, payload = search_city(base_urls, site_id, api_key, CITY_IDS["Bangkok"], check_in, check_out)
         except AuthError as exc:
-            print(f"PROBE FAILED: Agoda rejected the request ({exc}). Check the secret AGODA_API_KEY and the site ID.")
+            print(f"PROBE FAILED: Agoda rejected the request ({exc}).")
+            # Shape of what was sent, never its content
+            guid = bool(re.fullmatch(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", api_key))
+            print(f"  site ID sent: {site_id}")
+            print(f"  API key sent: {len(api_key)} characters, GUID format (8-4-4-4-12): {'yes' if guid else 'no'}, "
+                  f"contains spaces: {'yes' if re.search(r'[ \t]', api_key) else 'no'}")
+            print("  Compare both with the API page of the Agoda partner portal: the site ID shown next to the key must match.")
             return 1
         results = payload.get("results") if isinstance(payload, dict) else None
         print(f"PROBE Bangkok {check_in} to {check_out}")
