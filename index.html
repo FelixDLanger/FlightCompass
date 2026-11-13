@@ -2442,12 +2442,14 @@ function showDP(ap){
   }
   var agodaHTML="";
   if(CFG.agodaCid&&hotelLive&&hotelLive.id){
-    var aUrl="https://www.agoda.com/partners/partnersearch.aspx?pcs=1&cid="+encodeURIComponent(CFG.agodaCid)+"&city="+encodeURIComponent(hotelLive.id);
+    // Same parameter names as the landing URLs the Agoda API returns (checkin/checkout, 2 adults, 1 room)
+    var aUrl="https://www.agoda.com/partners/partnersearch.aspx?cid="+encodeURIComponent(CFG.agodaCid)+"&city="+encodeURIComponent(hotelLive.id)+"&currency=EUR";
     var today2=todayISO(),aDates="";
     if(ap.depart_date&&ap.return_date&&ap.depart_date>=today2&&ap.return_date>ap.depart_date){
-      aUrl+="&checkIn="+ap.depart_date+"&checkOut="+ap.return_date;
+      aUrl+="&checkin="+ap.depart_date+"&checkout="+ap.return_date;
       aDates=" \u00B7 "+fmtShortDate(ap.depart_date)+" \u2192 "+fmtShortDate(ap.return_date);
     }
+    aUrl+="&NumberofAdults=2&NumberofChildren=0&Rooms=1&pcs=1";
     agodaHTML='<div style="margin-top:10px;padding:10px 12px;background:rgba(0,212,255,.04);border:1px solid var(--bd);border-radius:7px;text-align:center">'
       +'<a href="'+aUrl+'" target="_blank" rel="noopener nofollow sponsored" style="display:inline-block;border:1px solid var(--cy);color:var(--cy);font-weight:800;font-size:12px;padding:8px 16px;border-radius:5px;text-decoration:none;letter-spacing:.3px">Check hotel prices on Agoda \u2192</a>'
       +'<div style="font-family:DM Mono,monospace;font-size:8px;color:var(--mt);margin-top:7px;line-height:1.5">Opens hotels in '+hotelCity+aDates+'. Affiliate link \u2014 see footer.</div>'
