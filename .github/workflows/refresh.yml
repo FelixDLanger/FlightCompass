@@ -17,13 +17,19 @@ on:
         type: boolean
         required: false
         default: false
+      flight_probe:
+        description: "Flight data test only: search a sample of routes, print how airports are labelled, change nothing"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: write
 
-# Never let two refreshes push at the same time
+# Never let two refreshes push at the same time. Test runs push nothing, so each gets its own
+# group and can run while a refresh is in progress.
 concurrency:
-  group: refresh-flight-data
+  group: ${{ (github.event.inputs.hotel_probe == 'true' || github.event.inputs.flight_probe == 'true') && format('refresh-test-{0}', github.run_id) || 'refresh-flight-data' }}
   cancel-in-progress: false
 
 jobs:
@@ -39,8 +45,19 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Flight data test (prints how the API labels airports, changes nothing)
+        if: ${{ github.event.inputs.flight_probe == 'true' }}
+        env:
+          TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
+        run: |
+          if [ -z "$TRAVELPAYOUTS_TOKEN" ]; then
+            echo "::error::TRAVELPAYOUTS_TOKEN secret is not set."
+            exit 1
+          fi
+          python3 fetch_snapshot.py --probe
+
       - name: Fetch Travelpayouts snapshot
-        if: ${{ github.event.inputs.hotel_probe != 'true' }}
+        if: ${{ github.event.inputs.hotel_probe != 'true' && github.event.inputs.flight_probe != 'true' }}
         env:
           TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
           # Passed through the environment, not pasted into the script, so the input can't inject shell code
@@ -69,6 +86,7 @@ jobs:
       # Hotel rates are optional: without the AGODA_API_KEY secret the step skips itself, and a failed
       # run leaves the previous hotel-data.json in place (the page falls back to its benchmarks).
       - name: Fetch Agoda hotel rates
+        if: ${{ github.event.inputs.flight_probe != 'true' }}
         continue-on-error: true
         env:
           AGODA_API_KEY: ${{ secrets.AGODA_API_KEY }}
@@ -90,7 +108,7 @@ jobs:
           fi
 
       - name: Commit and push if changed
-        if: ${{ github.event.inputs.hotel_probe != 'true' }}
+        if: ${{ github.event.inputs.hotel_probe != 'true' && github.event.inputs.flight_probe != 'true' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

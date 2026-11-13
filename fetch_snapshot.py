@@ -13,14 +13,23 @@ Usage:
     TRAVELPAYOUTS_TOKEN=xxx python3 fetch_snapshot.py
     TRAVELPAYOUTS_TOKEN=xxx python3 fetch_snapshot.py --origins BKK,SIN,FRA,LHR,DXB
     TRAVELPAYOUTS_TOKEN=xxx python3 fetch_snapshot.py --month 2026-11
+    TRAVELPAYOUTS_TOKEN=xxx python3 fetch_snapshot.py --probe   (test only: prints how the API
+                                                                 labels airports, writes nothing)
+
+Airport codes: the API answers with CITY codes in "origin"/"destination" (LON, TYO, NYC...)
+and puts the airport in "origin_airport"/"destination_airport". The page works with airport
+codes, so the snapshot stores the airports.
 """
 from __future__ import annotations
 
 import argparse
+import collections
 import json
 import os
+import re
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -55,7 +64,8 @@ DEFAULT_ORIGINS = [
 DEFAULT_DESTINATIONS = [
     # Asia (deeper coverage)
     "BKK","SIN","KUL","CGK","MNL","HKG","TPE","ICN","NRT","HND","KIX","BOM","DEL",
-    "BLR","SGN","HAN","DPS","PNH","REP","RGN","CMB","KTM","PEK","PVG","CAN","SZX",
+    # SAI replaced Siem Reap's old airport REP in October 2023; the API rejects REP.
+    "BLR","SGN","HAN","DPS","PNH","SAI","RGN","CMB","KTM","PEK","PVG","CAN","SZX",
     "MFM","HKT","DAD","CXR",
     # Europe (expanded secondary cities)
     "LHR","LGW","CDG","ORY","FRA","MUC","BER","AMS","MAD","BCN","PMI","FCO","MXP",
@@ -72,15 +82,43 @@ DEFAULT_DESTINATIONS = [
     "MEL","SYD","BNE","PER","AKL","CHC","NAN",
 ]
 
+# Airports that share a city. The API rejects a search between two of them (HTTP 400),
+# so those pairs are skipped.
+SAME_CITY = {
+    "LHR": "LON", "LGW": "LON", "STN": "LON", "LTN": "LON", "LCY": "LON",
+    "CDG": "PAR", "ORY": "PAR",
+    "NRT": "TYO", "HND": "TYO",
+    "KIX": "OSA", "ITM": "OSA",
+    "ICN": "SEL", "GMP": "SEL",
+    "PEK": "BJS", "PKX": "BJS",
+    "PVG": "SHA", "SHA": "SHA",
+    "IST": "IST", "SAW": "IST",
+    "FCO": "ROM", "CIA": "ROM",
+    "MXP": "MIL", "LIN": "MIL", "BGY": "MIL",
+    "JFK": "NYC", "EWR": "NYC", "LGA": "NYC",
+    "ORD": "CHI", "MDW": "CHI",
+    "GRU": "SAO", "CGH": "SAO", "VCP": "SAO",
+    "GIG": "RIO", "SDU": "RIO",
+    "EZE": "BUE", "AEP": "BUE",
+    "CGK": "JKT", "HLP": "JKT",
+    "BKK": "BKK", "DMK": "BKK",
+    "DXB": "DXB", "DWC": "DXB",
+}
 
-def fetch_route(origin: str, destination: str, month: str | None, token: str, one_way: bool = False) -> list[dict[str, Any]]:
-    """Fetch cheapest tickets for one origin->destination.
+_IATA = re.compile(r"[A-Z]{3}")
 
-    Args:
-        one_way: If True, fetch one-way tickets. If False (default), fetch round-trips.
-    """
-    if origin == destination:
-        return []
+
+def same_city(a: str, b: str) -> bool:
+    return a == b or (a in SAME_CITY and SAME_CITY[a] == SAME_CITY.get(b))
+
+
+def airport_code(value: Any) -> str | None:
+    """A 3-letter airport code from the API, or None when the field is missing or malformed."""
+    return value if isinstance(value, str) and _IATA.fullmatch(value) else None
+
+
+def fetch_payload(origin: str, destination: str, month: str | None, token: str, one_way: bool = False) -> dict[str, Any]:
+    """Raw API answer for one origin->destination search (raises on HTTP errors)."""
     params = {
         "origin": origin,
         "destination": destination,
@@ -115,23 +153,44 @@ def fetch_route(origin: str, destination: str, month: str | None, token: str, on
                 time.sleep(2 * (attempt + 1))
                 continue
             raise
+    return payload if isinstance(payload, dict) else {}
+
+
+def fetch_route(origin: str, destination: str, month: str | None, token: str, one_way: bool = False) -> list[dict[str, Any]]:
+    """Fetch cheapest tickets for one origin->destination.
+
+    Args:
+        one_way: If True, fetch one-way tickets. If False (default), fetch round-trips.
+    """
+    if same_city(origin, destination):
+        return []
+    payload = fetch_payload(origin, destination, month, token, one_way)
     if not payload.get("success"):
         return []
     data = payload.get("data") or []
     if not isinstance(data, list):
         return []
-    return data
+    return [item for item in data if isinstance(item, dict)]
 
 
-def normalise(items: list[dict[str, Any]], origin: str) -> list[dict[str, Any]]:
-    """Normalise Travelpayouts response items into our snapshot schema."""
+def normalise(items: list[dict[str, Any]], origin: str, destination: str) -> list[dict[str, Any]]:
+    """Normalise Travelpayouts response items into our snapshot schema.
+
+    origin/destination are the airports that were searched. The stored codes are the airports
+    the fare actually uses ("origin_airport"/"destination_airport"); the API's own
+    "origin"/"destination" fields hold city codes (LON, TYO...), which the page cannot place.
+    """
     out = []
     for item in items:
-        if not item.get("price") or not item.get("destination"):
+        if not item.get("price"):
+            continue
+        dep = airport_code(item.get("origin_airport")) or origin
+        arr = airport_code(item.get("destination_airport")) or destination
+        if dep == arr:
             continue
         out.append({
-            "origin": item.get("origin") or origin,
-            "destination": item.get("destination"),
+            "origin": dep,
+            "destination": arr,
             # NOTE: with currency=eur, "price" is in EUR (not RUB).
             # HTML will treat .value as EUR if .currency=="EUR"
             "value": item.get("price"),
@@ -155,6 +214,92 @@ def normalise(items: list[dict[str, Any]], origin: str) -> list[dict[str, Any]]:
     return out
 
 
+def probe(token: str, origins: list[str], destinations: list[str]) -> int:
+    """Test run: search a sample of routes and print how the API labels airports. Writes nothing.
+
+    Pass 1 searches every destination from three origins (shows which arrival airports come back);
+    pass 2 searches five destinations from every origin (shows which departure airports come back).
+    """
+    pairs: list[tuple[str, str]] = []
+    for o in ["BKK", "LHR", "JFK"]:
+        pairs += [(o, d) for d in destinations]
+    for o in origins:
+        pairs += [(o, d) for d in ["IST", "DXB", "BKK", "LHR", "SIN"]]
+    pairs = [p for p in dict.fromkeys(pairs) if not same_city(*p)]
+    print(f"PROBE {len(pairs)} origin-destination pairs, round trip and one way")
+
+    fields: collections.Counter = collections.Counter()
+    by_origin: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
+    by_dest: dict[str, collections.Counter] = collections.defaultdict(collections.Counter)
+    city_of: dict[str, set] = collections.defaultdict(set)
+    empty: dict[str, int] = collections.Counter()
+    searches: dict[str, int] = collections.Counter()
+    empty_sample: dict[str, str] = {}
+    http_errors: list[str] = []
+    items_total = no_oa = no_da = 0
+    t0 = time.time()
+    for o, d in pairs:
+        for one_way in (False, True):
+            searches[o] += 1
+            try:
+                payload = fetch_payload(o, d, None, token, one_way)
+            except urllib.error.HTTPError as exc:
+                http_errors.append(f"{o}->{d} {'OW' if one_way else 'RT'}: HTTP {exc.code}")
+                continue
+            except Exception as exc:  # network trouble: note it and carry on
+                http_errors.append(f"{o}->{d} {'OW' if one_way else 'RT'}: {type(exc).__name__}")
+                continue
+            data = payload.get("data") if payload.get("success") else None
+            if not isinstance(data, list) or not data:
+                empty[o] += 1
+                if o not in empty_sample:
+                    empty_sample[o] = json.dumps({k: v for k, v in payload.items() if k != "data"})[:300] + \
+                        f" data={'[]' if isinstance(data, list) else type(payload.get('data')).__name__}"
+                continue
+            for it in data:
+                if not isinstance(it, dict):
+                    continue
+                items_total += 1
+                fields.update(it.keys())
+                oa, da = airport_code(it.get("origin_airport")), airport_code(it.get("destination_airport"))
+                no_oa += oa is None
+                no_da += da is None
+                by_origin[o][oa or "(none)"] += 1
+                by_dest[d][da or "(none)"] += 1
+                if oa:
+                    city_of[oa].add(str(it.get("origin")))
+                if da:
+                    city_of[da].add(str(it.get("destination")))
+            time.sleep(0.05)
+
+    print(f"Done in {time.time() - t0:.0f}s: {items_total} fares, {len(http_errors)} HTTP errors")
+    print("Fields in each fare: " + ", ".join(f"{k} ({v})" for k, v in sorted(fields.items())))
+    print(f"Fares without origin_airport: {no_oa}; without destination_airport: {no_da}")
+
+    def show(title: str, table: dict[str, collections.Counter]) -> None:
+        print(f"\n{title}")
+        for code in sorted(table):
+            c = table[code]
+            total, own = sum(c.values()), c.get(code, 0)
+            other = ", ".join(f"{k} {v}" for k, v in c.most_common() if k != code)
+            print(f"  {code}: {total} fares, {own} use {code}" + (f"; others: {other}" if other else ""))
+
+    show("Searched origin -> airports the fares depart from", by_origin)
+    show("Searched destination -> airports the fares arrive at", by_dest)
+    print("\nAirport -> city code the API reports for it")
+    print("  " + ", ".join(f"{a}={'/'.join(sorted(c))}" for a, c in sorted(city_of.items())))
+    searched = set(origins) | set(destinations)
+    print("\nAirports in the answers that were not searched: " +
+          (", ".join(sorted(a for a in city_of if a not in searched)) or "none"))
+    print("\nOrigins with empty answers (empty / searches):")
+    for o in sorted(empty, key=lambda k: -empty[k] / searches[k]):
+        print(f"  {o}: {empty[o]}/{searches[o]}; first empty answer: {empty_sample.get(o, '')}")
+    if http_errors:
+        print("\nHTTP errors:\n  " + "\n  ".join(http_errors[:40]))
+    print("\nPROBE OK" if items_total else "\nPROBE FAILED: no fares came back")
+    return 0 if items_total else 1
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Fetch FlightCompass snapshot via Travelpayouts API")
     parser.add_argument("--origin", default=None, help="Single origin IATA")
@@ -163,6 +308,8 @@ def main() -> int:
     parser.add_argument("--month", default=None, help="Departure month filter: YYYY-MM (e.g. 2026-11). Default: no filter.")
     parser.add_argument("--out", default="flight-data.json")
     parser.add_argument("--token", default=None, help="Travelpayouts API token (or set TRAVELPAYOUTS_TOKEN env var)")
+    parser.add_argument("--probe", action="store_true",
+                        help="Test only: search a sample, print how the API labels airports, write nothing")
     args = parser.parse_args()
 
     token = args.token or os.environ.get("TRAVELPAYOUTS_TOKEN")
@@ -184,18 +331,21 @@ def main() -> int:
         else DEFAULT_DESTINATIONS
     )
 
+    if args.probe:
+        return probe(token, origins, destinations)
+
     all_routes: list[dict[str, Any]] = []
     counts: dict[str, int] = {}
 
     for origin in origins:
         origin_count = 0
         for destination in destinations:
-            if destination == origin:
+            if same_city(origin, destination):
                 continue
             # Fetch round-trip first (default; richer for typical bookings)
             try:
                 raw_rt = fetch_route(origin, destination, args.month, token, one_way=False)
-                routes_rt = normalise(raw_rt, origin)
+                routes_rt = normalise(raw_rt, origin, destination)
                 all_routes.extend(routes_rt)
                 origin_count += len(routes_rt)
                 time.sleep(0.05)
@@ -204,7 +354,7 @@ def main() -> int:
             # Fetch one-way (matters for budget SEA routes and Aviasales cache coverage)
             try:
                 raw_ow = fetch_route(origin, destination, args.month, token, one_way=True)
-                routes_ow = normalise(raw_ow, origin)
+                routes_ow = normalise(raw_ow, origin, destination)
                 all_routes.extend(routes_ow)
                 origin_count += len(routes_ow)
                 time.sleep(0.05)
@@ -216,6 +366,17 @@ def main() -> int:
     if not all_routes:
         print("\nNo routes fetched. Aborting (snapshot not overwritten).", file=sys.stderr)
         return 1
+
+    # The API also returns fares for nearby airports (FLL for a Miami search, EWR for New York...).
+    # They are stored under their own airport code; list them so the page's airport tables can be
+    # kept complete (a code the page does not know is left off the map).
+    searched_o, searched_d = set(origins), set(destinations)
+    extra_o = collections.Counter(r["origin"] for r in all_routes if r["origin"] not in searched_o)
+    extra_d = collections.Counter(r["destination"] for r in all_routes if r["destination"] not in searched_d)
+    if extra_o:
+        print("Fares from nearby airports: " + ", ".join(f"{k} {v}" for k, v in extra_o.most_common()))
+    if extra_d:
+        print("Fares to nearby airports: " + ", ".join(f"{k} {v}" for k, v in extra_d.most_common()))
 
     snapshot = {
         "meta": {
