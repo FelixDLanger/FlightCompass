@@ -17,8 +17,9 @@ Usage:
                                                                  labels airports, writes nothing)
 
 Airport codes: the API answers with CITY codes in "origin"/"destination" (LON, TYO, NYC...)
-and puts the airport in "origin_airport"/"destination_airport". The page works with airport
-codes, so the snapshot stores the airports.
+and puts the airports in "origin_airport"/"destination_airport". The page works with airport
+codes, so the snapshot stores airports: "origin" is the searched airport, "origin_airport" (only
+when different) the nearby airport a fare really departs from, "destination" the arrival airport.
 """
 from __future__ import annotations
 
@@ -176,9 +177,13 @@ def fetch_route(origin: str, destination: str, month: str | None, token: str, on
 def normalise(items: list[dict[str, Any]], origin: str, destination: str) -> list[dict[str, Any]]:
     """Normalise Travelpayouts response items into our snapshot schema.
 
-    origin/destination are the airports that were searched. The stored codes are the airports
-    the fare actually uses ("origin_airport"/"destination_airport"); the API's own
-    "origin"/"destination" fields hold city codes (LON, TYO...), which the page cannot place.
+    origin/destination are the airports that were searched. The API's own "origin"/"destination"
+    fields hold CITY codes (LON, TYO...), which the page cannot place, so they are not used.
+    - "origin" stays the searched airport: the page lists fares by the airport the visitor picked.
+      When the API adds a fare from another airport of that city or a nearby one (DMK for a
+      Bangkok search, SAW for Istanbul, SHJ for Dubai), "origin_airport" names the airport the
+      fare really departs from. It is present only then.
+    - "destination" is the airport the fare really arrives at ("destination_airport").
     """
     out = []
     for item in items:
@@ -186,10 +191,11 @@ def normalise(items: list[dict[str, Any]], origin: str, destination: str) -> lis
             continue
         dep = airport_code(item.get("origin_airport")) or origin
         arr = airport_code(item.get("destination_airport")) or destination
-        if dep == arr:
+        if dep == arr or arr == origin:
             continue
         out.append({
-            "origin": dep,
+            "origin": origin,
+            "origin_airport": dep if dep != origin else None,
             "destination": arr,
             # NOTE: with currency=eur, "price" is in EUR (not RUB).
             # HTML will treat .value as EUR if .currency=="EUR"
@@ -367,11 +373,11 @@ def main() -> int:
         print("\nNo routes fetched. Aborting (snapshot not overwritten).", file=sys.stderr)
         return 1
 
-    # The API also returns fares for nearby airports (FLL for a Miami search, EWR for New York...).
-    # They are stored under their own airport code; list them so the page's airport tables can be
-    # kept complete (a code the page does not know is left off the map).
-    searched_o, searched_d = set(origins), set(destinations)
-    extra_o = collections.Counter(r["origin"] for r in all_routes if r["origin"] not in searched_o)
+    # The API also returns fares for other airports of the searched city and nearby ones (DMK for
+    # Bangkok, SAW for Istanbul, FLL for Miami). List them so the page's airport tables can be kept
+    # complete: a destination code the page does not know is left off the map.
+    searched_d = set(destinations)
+    extra_o = collections.Counter(r["origin_airport"] for r in all_routes if "origin_airport" in r)
     extra_d = collections.Counter(r["destination"] for r in all_routes if r["destination"] not in searched_d)
     if extra_o:
         print("Fares from nearby airports: " + ", ".join(f"{k} {v}" for k, v in extra_o.most_common()))
@@ -388,6 +394,8 @@ def main() -> int:
             "route_count": len(all_routes),
             "counts_by_origin": counts,
             "build_note": "Tuesday refresh catches airlines' weekly sale cycle.",
+            "airport_note": "origin is the searched airport; origin_airport, when present, is the "
+                            "nearby airport the fare really departs from; destination is the arrival airport.",
         },
         "routes": all_routes,
     }
