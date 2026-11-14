@@ -695,7 +695,7 @@ var ORIGIN_ALLIANCES={
   // Middle East
   DXB:["none"],DOH:["oneworld"],RUH:["oneworld","skyteam"],
   // Asia (Bangkok and Singapore: Thai and Singapore Airlines hubs with nonstop KLM, Air France and BA/Qantas to Europe)
-  SIN:["star","oneworld","skyteam"],BKK:["star","oneworld","skyteam"],HKG:["oneworld"],
+  SIN:["star","oneworld","skyteam"],BKK:["star","oneworld","skyteam"],HKT:["star","oneworld","skyteam"],HKG:["oneworld"],
   NRT:["star","oneworld"],HND:["star","oneworld"],
   ICN:["skyteam","star"],KUL:["oneworld"],CGK:["skyteam"],
   TPE:["star","skyteam"],DEL:["star","oneworld"],BOM:["star","oneworld"],
@@ -1326,7 +1326,7 @@ AVV:"Australia",BUR:"USA",DWC:"UAE",HHN:"Germany",KTI:"Cambodia",NLU:"Mexico",ON
 
 // City name -> primary IATA mapping for friendly origin input
 var CITY_TO_IATA={
-  "bangkok":"BKK","singapore":"SIN","kuala lumpur":"KUL","jakarta":"CGK","bali":"DPS",
+  "bangkok":"BKK","phuket":"HKT","singapore":"SIN","kuala lumpur":"KUL","jakarta":"CGK","bali":"DPS",
   "denpasar":"DPS","manila":"MNL","hong kong":"HKG","taipei":"TPE","seoul":"ICN",
   "tokyo":"NRT","osaka":"KIX","mumbai":"BOM","delhi":"DEL","new delhi":"DEL",
   "ho chi minh":"SGN","saigon":"SGN","hanoi":"HAN","phnom penh":"PNH","vientiane":"VTE",
@@ -1490,7 +1490,7 @@ var NEAREST_HUB={
   "prague":"VIE","budapest":"VIE","warsaw":"FRA","krakow":"FRA","bucharest":"VIE","sofia":"VIE",
   "lisbon":"MAD","porto":"MAD",
   // SEA secondary
-  "phuket":"BKK","chiang mai":"BKK","penang":"KUL","cebu":"MNL","yogyakarta":"CGK","surabaya":"CGK","danang":"SGN",
+  "riyadh":"DOH","chiang mai":"BKK","penang":"KUL","cebu":"MNL","yogyakarta":"CGK","surabaya":"CGK","danang":"SGN",
   // Greater China secondary
   "macau":"HKG","kaohsiung":"TPE","chengdu":"PEK","chongqing":"PEK","xian":"PEK","wuhan":"PEK","nanjing":"PVG","hangzhou":"PVG",
   // Japan secondary
@@ -1508,7 +1508,7 @@ var NEAREST_HUB={
 // Snapshot-eligible origins (must match DEFAULT_ORIGINS in fetch_snapshot.py)
 var SNAPSHOT_ORIGINS={"BKK":1,"SIN":1,"KUL":1,"CGK":1,"MNL":1,"DPS":1,"SGN":1,"HAN":1,
   "HKG":1,"TPE":1,"ICN":1,"NRT":1,"HND":1,"KIX":1,"PEK":1,"PVG":1,"CAN":1,"SZX":1,
-  "BOM":1,"DEL":1,"BLR":1,"DXB":1,"DOH":1,"AUH":1,"RUH":1,
+  "BOM":1,"DEL":1,"BLR":1,"DXB":1,"DOH":1,"AUH":1,"HKT":1,
   "LHR":1,"LGW":1,"CDG":1,"ORY":1,"FRA":1,"MUC":1,"BER":1,"AMS":1,"MAD":1,"BCN":1,
   "FCO":1,"MXP":1,"ZRH":1,"VIE":1,"IST":1,"ATH":1,
   "LAX":1,"JFK":1,"SFO":1,"ORD":1,"MIA":1,"DFW":1,"YYZ":1,

@@ -40,13 +40,13 @@ from typing import Any
 API_BASE = "https://api.travelpayouts.com/aviasales/v3/prices_for_dates"
 DEFAULT_ORIGINS = [
     # SEA hubs (primary user base)
-    "BKK", "SIN", "KUL", "CGK", "MNL", "DPS", "SGN", "HAN",
+    "BKK", "HKT", "SIN", "KUL", "CGK", "MNL", "DPS", "SGN", "HAN",
     # East Asia (deep APAC coverage)
     "HKG", "TPE", "ICN", "NRT", "HND", "KIX", "PEK", "PVG", "CAN", "SZX",
     # South Asia
     "BOM", "DEL", "BLR",
-    # Middle East hubs
-    "DXB", "DOH", "AUH", "RUH",
+    # Middle East hubs (Riyadh RUH dropped in Nov 2026: the API has no fares for it)
+    "DXB", "DOH", "AUH",
     # Europe major (second base)
     "LHR", "LGW", "CDG", "ORY", "FRA", "MUC", "BER", "AMS", "MAD", "BCN",
     "FCO", "MXP", "ZRH", "VIE", "IST", "ATH",
